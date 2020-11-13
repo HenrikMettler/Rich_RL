@@ -8,22 +8,42 @@ import cgp
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 
 
-def inner_objective(f: Callable, seed: int):
-    raise NotImplementedError
+def inner_objective(f: Callable, env: gym.Env, n_timesteps: int, seed: int):
+
+    env.seed(seed)
+
+    cum_reward: float = 0.0
+    observation = env.reset()
+
+    for _ in range(n_timesteps):
+
+        # Todo: adapt what the observation is, what is feed into
+        continuous_action = f(observation)
+        observation, reward, done, _ = env.step(continuous_action)
+        cum_reward += reward
+
+        if done:
+            observation = env.reset()
+
+    env.close()
+
+    return cum_reward
 
 
-def objective(individual: cgp.IndividualSingleGenome, seed: int):
+def objective(individual: cgp.IndividualSingleGenome, env: gym.Env, n_timesteps, seed:int):
     if individual.fitness is not None:
         return individual
 
-    f = individual.to_func()
+    f: Callable = individual.to_func()
 
-    individual.fitness = inner_objective(f, seed)
+    individual.fitness = inner_objective(f=f, env=env, n_timesteps=n_timesteps, seed=seed)
 
     return individual
 
 
 seed = 1234
+
+# cgp parameterisation
 population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
 genome_params = {
     "n_inputs": 4,  # pre, post, weight, reward
@@ -38,6 +58,11 @@ evolve_params = {"max_generations": 1000, "min_fitness": 0.0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
+
+# environment parameterisation
+env = gym.make('Mountain')
+
+# initialize a history
 history = {}
 history["fitness_champion"] = []
 
