@@ -49,14 +49,7 @@ class Network(nn.Module):
 
         return hidden_activities, output_activities
 
-    def select_action(self, observation: np.array) -> np.ndarray:
-        """ Picks an action from a given observation
+    def update_weights(self, f: Callable, observation: np.ndarray, hidden_activities: torch.Tensor,
+                       output_activities: torch.Tensor, reward: float, learning_rate: float)-> None:
+        raise NotImplementedError
 
-        Parameters
-        ----------
-        observation: np.array
-            Current state input from environment
-
-        """
-        _, action = self.forward(observation=observation)
-        return action.detach().numpy()

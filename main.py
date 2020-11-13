@@ -2,6 +2,7 @@ import numpy as np
 import gym
 import sympy
 import functools
+import torch
 
 import cgp
 
@@ -10,7 +11,8 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 from network import Network
 
 
-def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: int, seed: int):
+def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: int,
+                    learning_rate: float, seed: int):
 
     env.seed(seed)
 
@@ -19,8 +21,15 @@ def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: in
 
     for _ in range(n_timesteps):
 
-        continuous_action = network.select_action(observation)
-        observation, reward, done, _ = env.step(continuous_action)
+        # compute forward pass and take a step
+        hidden_activities, output_activities = network.forward(observation)
+        action: np.ndarray = output_activities.detach().numpy()  # Todo: adapt for more than one output
+        observation, reward, done, _ = env.step(action)
+
+        # update the weights according to f
+        network.update_weights(f=f, observation=observation, hidden_activities=hidden_activities,
+                               output_activities=output_activities, learning_rate=learning_rate,
+                               reward=reward)
         cum_reward += reward
 
         if done:
@@ -32,21 +41,22 @@ def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: in
 
 
 def objective(individual: cgp.IndividualSingleGenome, network: Network,
-              env: gym.Env, n_timesteps, seed:int):
+              env: gym.Env, n_timesteps, learning_rate: float, seed:int):
     if individual.fitness is not None:
         return individual
 
     f: Callable = individual.to_func()
 
-    individual.fitness = inner_objective(f=f, network=network,
-                                         env=env, n_timesteps=n_timesteps, seed=seed)
+    individual.fitness = inner_objective(f=f, network=network, env=env,
+                                         n_timesteps=n_timesteps, learning_rate=learning_rate,
+                                         seed=seed)
 
     return individual
 
 
 seed = 1234
 n_timesteps = 1000
-
+learning_rate = 0.05
 
 # population and evolutionary algorithm initialization
 population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
@@ -82,5 +92,6 @@ def recording_callback(pop):
     history["fitness_champion"].append(pop.champion.fitness)
 
 
-obj = functools.partial(objective, network=network, env=env, n_timesteps=n_timesteps, seed=seed)
+obj = functools.partial(objective, network=network, env=env, n_timesteps=n_timesteps,
+                        learning_rate= learning_rate, seed=seed)
 cgp.evolve(pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback)
