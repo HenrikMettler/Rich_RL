@@ -1,8 +1,9 @@
 import numpy as np
 import gym
+import torch
 import sympy
 import functools
-import torch
+import warnings
 
 import cgp
 
@@ -11,8 +12,14 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 from network import Network
 
 
-def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: int,
-                    learning_rate: float, seed: int):
+def inner_objective(
+    f: Callable,
+    network: Network,
+    env: gym.Env,
+    n_timesteps: int,
+    learning_rate: float,
+    seed: int,
+):
 
     env.seed(seed)
 
@@ -27,9 +34,14 @@ def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: in
         observation, reward, done, _ = env.step(action)
 
         # update the weights according to f
-        network.update_weights(f=f, observation=observation, hidden_activities=hidden_activities,
-                               output_activities=output_activities, learning_rate=learning_rate,
-                               reward=reward)
+        network.update_weights(
+            f=f,
+            observation=observation,
+            hidden_activities=hidden_activities,
+            output_activities=output_activities,
+            learning_rate=learning_rate,
+            reward=reward,
+        )
         cum_reward += reward
 
         if done:
@@ -40,16 +52,36 @@ def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: in
     return cum_reward
 
 
-def objective(individual: cgp.IndividualSingleGenome, network: Network,
-              env: gym.Env, n_timesteps, learning_rate: float, seed:int):
+def objective(
+    individual: cgp.IndividualSingleGenome,
+    network: Network,
+    env: gym.Env,
+    n_timesteps,
+    learning_rate: float,
+    seed: int,
+):
     if individual.fitness is not None:
         return individual
 
     f: Callable = individual.to_func()
-
-    individual.fitness = inner_objective(f=f, network=network, env=env,
-                                         n_timesteps=n_timesteps, learning_rate=learning_rate,
-                                         seed=seed)
+    try:
+        with warnings.catch_warnings():  # ignore warnings due to zero division
+            warnings.filterwarnings(
+                "ignore", message="divide by zero encountered in double_scalars"
+            )
+            warnings.filterwarnings(
+                "ignore", message="invalid value encountered in double_scalars"
+            )
+            individual.fitness = inner_objective(
+                f=f,
+                network=network,
+                env=env,
+                n_timesteps=n_timesteps,
+                learning_rate=learning_rate,
+                seed=seed,
+            )
+    except ZeroDivisionError:
+        individual.fitness = -np.inf
 
     return individual
 
@@ -92,6 +124,14 @@ def recording_callback(pop):
     history["fitness_champion"].append(pop.champion.fitness)
 
 
-obj = functools.partial(objective, network=network, env=env, n_timesteps=n_timesteps,
-                        learning_rate= learning_rate, seed=seed)
-cgp.evolve(pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback)
+obj = functools.partial(
+    objective,
+    network=network,
+    env=env,
+    n_timesteps=n_timesteps,
+    learning_rate=learning_rate,
+    seed=seed,
+)
+cgp.evolve(
+    pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback
+)

@@ -7,6 +7,7 @@ from typing import Callable, Tuple
 
 class Network(nn.Module):
     """ Network class"""
+
     def __init__(self, n_inputs: int, n_hidden_layer: int, n_outputs: int) -> None:
         """ Init function
         
@@ -49,7 +50,25 @@ class Network(nn.Module):
 
         return hidden_activities, output_activities
 
-    def update_weights(self, f: Callable, observation: np.ndarray, hidden_activities: torch.Tensor,
-                       output_activities: torch.Tensor, reward: float, learning_rate: float)-> None:
-        raise NotImplementedError
+    def update_weights(
+        self,
+        f: Callable,
+        observation: np.ndarray,
+        hidden_activities: torch.Tensor,
+        output_activities: torch.Tensor,
+        reward: float,
+        learning_rate: float,
+    ) -> None:
+        # Todo: doing this element wise must be highly inefficient -> optimize with numpy or torch
+
+        # first layer update
+        for idx_obs, observation_element in enumerate(observation):
+            for hidden_activity, weight in zip(hidden_activities,
+                                               self.hidden_layer.weight[:, idx_obs]):
+                weight += learning_rate * f([observation_element, hidden_activity,
+                                             weight, reward])[0]
+        # second layer update Todo: only works with singe output!
+        for hidden_activity, output_weight in zip(hidden_activities, self.output_layer.weight):
+            output_weight += learning_rate*f([hidden_activity, output_activities,
+                                              output_weight, reward])[0]
 
