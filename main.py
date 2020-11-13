@@ -7,18 +7,20 @@ import cgp
 
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 
+from network import Network
 
-def inner_objective(f: Callable, env: gym.Env, n_timesteps: int, seed: int):
+
+def inner_objective(f: Callable, network: Network, env: gym.Env, n_timesteps: int, seed: int):
 
     env.seed(seed)
 
     cum_reward: float = 0.0
-    observation = env.reset()
+    observation: np.array = env.reset()
 
     for _ in range(n_timesteps):
 
         # Todo: adapt what the observation is, what is feed into
-        continuous_action = f(observation)
+        continuous_action = network.select_action(observation, f)
         observation, reward, done, _ = env.step(continuous_action)
         cum_reward += reward
 
