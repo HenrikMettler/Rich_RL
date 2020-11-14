@@ -19,18 +19,20 @@ def inner_objective(
     n_timesteps: int,
     learning_rate: float,
     seed: int,
-):
+) -> float:
 
     env.seed(seed)
 
     cum_reward: float = 0.0
     observation: np.array = env.reset()
-
     for _ in range(n_timesteps):
 
         # compute forward pass and take a step
         hidden_activities, output_activities = network.forward(observation)
         action: np.ndarray = output_activities.detach().numpy()  # Todo: adapt for more than one output
+        if np.isnan(action):  # return early if actions diverge
+            return -np.inf
+
         observation, reward, done, _ = env.step(action)
 
         # update the weights according to f
@@ -87,7 +89,7 @@ def objective(
 
 
 seed = 1234
-n_timesteps = 1000
+n_timesteps = 10000
 learning_rate = 0.05
 
 # population and evolutionary algorithm initialization
@@ -95,13 +97,13 @@ population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
 genome_params = {
     "n_inputs": 4,  # pre, post, weight, reward
     "n_outputs": 1,
-    "n_columns": 12,
+    "n_columns": 25,
     "n_rows": 1,
-    "levels_back": 5,
+    "levels_back": None,
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 1000, "min_fitness": 10.0}
+evolve_params = {"max_generations": 10000, "min_fitness": 10.0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
