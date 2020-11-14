@@ -89,7 +89,7 @@ def objective(
 
 
 seed = 1234
-n_timesteps = 10000
+n_timesteps = 1000
 learning_rate = 0.05
 
 # population and evolutionary algorithm initialization
@@ -103,7 +103,7 @@ genome_params = {
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 10000, "min_fitness": 10.0}
+evolve_params = {"max_generations": 1000, "min_fitness": 10.0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
@@ -113,7 +113,7 @@ env = gym.make("MountainCarContinuous-v0")
 
 # network initialization
 n_inputs = env.observation_space.shape[0]
-n_hidden_layer = 10
+n_hidden_layer = 100
 n_outputs = env.action_space.shape[0]
 network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs)
 
