@@ -56,7 +56,7 @@ def inner_objective(
 
 def objective(
     individual: cgp.IndividualSingleGenome,
-    network: Network,
+    #network: Network,
     env: gym.Env,
     n_timesteps,
     learning_rate: float,
@@ -64,6 +64,12 @@ def objective(
 ):
     if individual.fitness is not None:
         return individual
+
+    # network initialization
+    n_inputs = env.observation_space.shape[0]
+    n_hidden_layer = 100
+    n_outputs = env.action_space.shape[0]
+    network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs)
 
     f: Callable = individual.to_func()
     try:
@@ -103,19 +109,13 @@ genome_params = {
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 1000, "min_fitness": 10.0}
+evolve_params = {"max_generations": 10000, "min_fitness": 10.0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
 
 # environment initialization
 env = gym.make("MountainCarContinuous-v0")
-
-# network initialization
-n_inputs = env.observation_space.shape[0]
-n_hidden_layer = 100
-n_outputs = env.action_space.shape[0]
-network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs)
 
 # initialize a history
 history = {}
@@ -128,7 +128,7 @@ def recording_callback(pop):
 
 obj = functools.partial(
     objective,
-    network=network,
+    #network=network,
     env=env,
     n_timesteps=n_timesteps,
     learning_rate=learning_rate,
