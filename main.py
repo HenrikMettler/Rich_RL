@@ -14,6 +14,7 @@ from network import Network
 
 def inner_objective(
     f: Callable,
+    t: torch.nn.Module,
     network: Network,
     env: gym.Env,
     n_timesteps: int,
@@ -36,14 +37,10 @@ def inner_objective(
         observation, reward, done, _ = env.step(action)
 
         # update the weights according to f
-        network.update_weights(
-            f=f,
-            observation=observation,
-            hidden_activities=hidden_activities,
-            output_activities=output_activities,
-            learning_rate=learning_rate,
-            reward=reward,
-        )
+        network.update_weights(f=f, t=t, observation=observation,
+                               hidden_activities=hidden_activities,
+                               output_activities=output_activities, reward=reward,
+                               learning_rate=learning_rate)
         cum_reward += reward
 
         if done:
@@ -72,6 +69,7 @@ def objective(
     network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs)
 
     f: Callable = individual.to_func()
+    t = individual.to_torch()
     try:
         with warnings.catch_warnings():  # ignore warnings due to zero division
             warnings.filterwarnings(
@@ -80,14 +78,9 @@ def objective(
             warnings.filterwarnings(
                 "ignore", message="invalid value encountered in double_scalars"
             )
-            individual.fitness = inner_objective(
-                f=f,
-                network=network,
-                env=env,
-                n_timesteps=n_timesteps,
-                learning_rate=learning_rate,
-                seed=seed,
-            )
+            individual.fitness = inner_objective(f=f, t=t, network=network, env=env,
+                                                 n_timesteps=n_timesteps,
+                                                 learning_rate=learning_rate, seed=seed)
     except ZeroDivisionError:
         individual.fitness = -np.inf
 

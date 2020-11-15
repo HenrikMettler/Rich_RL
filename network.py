@@ -53,14 +53,15 @@ class Network(nn.Module):
     def update_weights(
         self,
         f: Callable,
+        t: torch.nn.Module,
         observation: np.ndarray,
         hidden_activities: torch.Tensor,
         output_activities: torch.Tensor,
         reward: float,
         learning_rate: float,
     ) -> None:
-        # Todo: doing this element wise must be highly inefficient -> optimize with numpy or torch
 
+        # element-wise implementation
         # first layer update
         for idx_obs, observation_element in enumerate(observation):
             for hidden_activity, weight in zip(hidden_activities,
@@ -72,3 +73,35 @@ class Network(nn.Module):
             output_weight += learning_rate*f([hidden_activity, output_activities,
                                               output_weight, reward])[0]
 
+
+        # implementation with torch
+
+        # ugly stuff to have data in correct shape
+        reward_repeated = torch.tensor(reward).repeat(hidden_activities.shape[0]).unsqueeze(dim=1)
+        hidden_activities = hidden_activities.unsqueeze(dim=1)
+
+        # first layer update
+        for idx_obs, observation_element in enumerate(observation):
+
+            # ugly stuff to make the inputs right shape and dtype
+            observation_repeated = torch.tensor(observation_element, dtype=torch.float32).\
+                repeat(hidden_activities.shape[0])
+            observation_repeated = observation_repeated.unsqueeze(dim=1)
+            weights = self.hidden_layer.weight[:, idx_obs]
+            weights = weights.unsqueeze(dim=1)
+            input_variables = torch.cat([observation_repeated, hidden_activities,
+                                         weights, reward_repeated], dim=1)
+
+            output = t(input_variables).squeeze(dim=1)
+            update = learning_rate * output
+            self.hidden_layer.weight[:, idx_obs] += update
+
+        # second layer update
+        output_activities_repeated = output_activities.repeat(hidden_activities.shape[0])
+        output_activities_repeated = output_activities_repeated.unsqueeze(dim=1)
+        weights = self.output_layer.weight.T
+        input_variables = torch.cat([hidden_activities, output_activities_repeated, weights, reward_repeated],
+                          dim=1)
+        output = t(input_variables)
+        update = learning_rate * output
+        self.output_layer.weight[:] += update.T
