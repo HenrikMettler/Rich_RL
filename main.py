@@ -4,6 +4,8 @@ import torch
 import sympy
 import functools
 import warnings
+import time
+import tracemalloc
 
 import cgp
 
@@ -47,6 +49,15 @@ def inner_objective(
             observation = env.reset()
 
     env.close()
+
+    # trace memory usage
+
+    #snapshot = tracemalloc.take_snapshot()
+    #top_stats = snapshot.statistics('lineno')
+
+    #print("[ Top 3 ]")
+    #for stat in top_stats[:3]:
+    #    print(stat)
 
     return cum_reward
 
@@ -102,7 +113,7 @@ genome_params = {
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 10000, "min_fitness": 10.0}
+evolve_params = {"max_generations": 1000, "min_fitness": 10.0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
@@ -113,10 +124,12 @@ env = gym.make("MountainCarContinuous-v0")
 # initialize a history
 history = {}
 history["fitness_champion"] = []
+history["expression_champion"] = []
 
 
 def recording_callback(pop):
     history["fitness_champion"].append(pop.champion.fitness)
+    history["expression_champion"].append(pop.champion.to_sympy())
 
 
 obj = functools.partial(
@@ -127,6 +140,19 @@ obj = functools.partial(
     learning_rate=learning_rate,
     seed=seed,
 )
+
+#tracemalloc.start()
+
+start = time.time()
 cgp.evolve(
     pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback
 )
+end = time.time()
+print(f"Time of running element-wise:", end-start)
+
+max_fitness = history["fitness_champion"][-1]
+best_expr = pop.champion.to_sympy()
+#best_expr = best_expr.replace("x_0", "pre").replace("x_1", "post").replace("x_2, "weight")
+# .replace("x_4", "reward")
+print(f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})  '
+      f'for {n_timesteps} timesteps per evaluation')

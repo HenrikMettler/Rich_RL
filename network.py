@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import tracemalloc
 
 from typing import Callable, Tuple
 
@@ -61,19 +62,6 @@ class Network(nn.Module):
         learning_rate: float,
     ) -> None:
 
-        # element-wise implementation
-        # first layer update
-        for idx_obs, observation_element in enumerate(observation):
-            for hidden_activity, weight in zip(hidden_activities,
-                                               self.hidden_layer.weight[:, idx_obs]):
-                weight += learning_rate * f([observation_element, hidden_activity,
-                                             weight, reward])[0]
-        # second layer update Todo: only works with singe output!
-        for hidden_activity, output_weight in zip(hidden_activities, self.output_layer.weight):
-            output_weight += learning_rate*f([hidden_activity, output_activities,
-                                              output_weight, reward])[0]
-
-
         # implementation with torch
 
         # ugly stuff to have data in correct shape
@@ -85,12 +73,12 @@ class Network(nn.Module):
 
             # ugly stuff to make the inputs right shape and dtype
             observation_repeated = torch.tensor(observation_element, dtype=torch.float32).\
-                repeat(hidden_activities.shape[0])
+                 repeat(hidden_activities.shape[0])
             observation_repeated = observation_repeated.unsqueeze(dim=1)
             weights = self.hidden_layer.weight[:, idx_obs]
             weights = weights.unsqueeze(dim=1)
             input_variables = torch.cat([observation_repeated, hidden_activities,
-                                         weights, reward_repeated], dim=1)
+                                          weights, reward_repeated], dim=1)
 
             output = t(input_variables).squeeze(dim=1)
             update = learning_rate * output
@@ -101,7 +89,20 @@ class Network(nn.Module):
         output_activities_repeated = output_activities_repeated.unsqueeze(dim=1)
         weights = self.output_layer.weight.T
         input_variables = torch.cat([hidden_activities, output_activities_repeated, weights, reward_repeated],
-                          dim=1)
+                           dim=1)
         output = t(input_variables)
         update = learning_rate * output
         self.output_layer.weight[:] += update.T
+
+        """# element-wise implementation
+        # first layer update
+        for idx_obs, observation_element in enumerate(observation):
+            for hidden_activity, weight in zip(hidden_activities,
+                                               self.hidden_layer.weight[:, idx_obs]):
+                weight += learning_rate * f([observation_element, hidden_activity,
+                                             weight, reward])[0]
+        # second layer update Todo: only works with singe output!
+        for hidden_activity, output_weight in zip(hidden_activities, self.output_layer.weight):
+            output_weight += learning_rate*f([hidden_activity, output_activities,
+                                              output_weight, reward])[0]
+        """
