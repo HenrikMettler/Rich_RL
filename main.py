@@ -19,7 +19,8 @@ def inner_objective(
     t: torch.nn.Module,
     network: Network,
     env: gym.Env,
-    n_timesteps: int,
+    n_episodes: int,
+    n_steps_per_episode: int,
     learning_rate: float,
     seed: int,
 ) -> float:
@@ -27,36 +28,41 @@ def inner_objective(
     env.seed(seed)
 
     cum_reward: float = 0.0
-    observation: np.array = env.reset()
-    for _ in range(n_timesteps):
+    for _ in range(n_episodes):
+        observation: np.array = env.reset()
+        for _ in range(n_steps_per_episode):
+            # compute forward pass and take a step
+            hidden_activities, output_activities = network.forward(observation)
+            action: np.ndarray = output_activities.detach().numpy()  # Todo: adapt for more than one output
+            if np.isnan(action):  # return early if actions diverge
+                return -np.inf
 
-        # compute forward pass and take a step
-        hidden_activities, output_activities = network.forward(observation)
-        action: np.ndarray = output_activities.detach().numpy()  # Todo: adapt for more than one output
-        if np.isnan(action):  # return early if actions diverge
-            return -np.inf
+            observation, reward, done, _ = env.step(action)
 
-        observation, reward, done, _ = env.step(action)
+            # update the weights according to f
+            network.update_weights(
+                f=f,
+                t=t,
+                observation=observation,
+                hidden_activities=hidden_activities,
+                output_activities=output_activities,
+                reward=reward,
+                learning_rate=learning_rate,
+            )
+            cum_reward += reward
 
-        # update the weights according to f
-        network.update_weights(f=f, t=t, observation=observation,
-                               hidden_activities=hidden_activities,
-                               output_activities=output_activities, reward=reward,
-                               learning_rate=learning_rate)
-        cum_reward += reward
-
-        if done:
-            observation = env.reset()
+            if done:
+                observation = env.reset()
 
     env.close()
 
     # trace memory usage
 
-    #snapshot = tracemalloc.take_snapshot()
-    #top_stats = snapshot.statistics('lineno')
+    # snapshot = tracemalloc.take_snapshot()
+    # top_stats = snapshot.statistics('lineno')
 
-    #print("[ Top 3 ]")
-    #for stat in top_stats[:3]:
+    # print("[ Top 3 ]")
+    # for stat in top_stats[:3]:
     #    print(stat)
 
     return cum_reward
@@ -64,9 +70,10 @@ def inner_objective(
 
 def objective(
     individual: cgp.IndividualSingleGenome,
-    #network: Network,
+    # network: Network,
     env: gym.Env,
-    n_timesteps,
+    n_episodes: int,
+    n_steps_per_episode: int,
     learning_rate: float,
     seed: int,
 ):
@@ -77,7 +84,9 @@ def objective(
     n_inputs = env.observation_space.shape[0]
     n_hidden_layer = 100
     n_outputs = env.action_space.shape[0]
-    network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs)
+    network = Network(
+        n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs
+    )
 
     f: Callable = individual.to_func()
     t = individual.to_torch()
@@ -90,7 +99,8 @@ def objective(
                 "ignore", message="invalid value encountered in double_scalars"
             )
             individual.fitness = inner_objective(f=f, t=t, network=network, env=env,
-                                                 n_timesteps=n_timesteps,
+                                                 n_episodes=n_episodes,
+                                                 n_steps_per_episode=n_steps_per_episode,
                                                  learning_rate=learning_rate, seed=seed)
     except ZeroDivisionError:
         individual.fitness = -np.inf
@@ -99,7 +109,8 @@ def objective(
 
 
 seed = 1234
-n_timesteps = 1000
+n_episodes = 5
+n_steps_per_episode = 1000
 learning_rate = 0.05
 
 # population and evolutionary algorithm initialization
@@ -113,7 +124,8 @@ genome_params = {
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 1000, "min_fitness": 10.0}
+evolve_params = {"max_generations": 1000, "min_fitness": n_episodes*90}
+# Task solved for Continuous Mountain car
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
@@ -134,25 +146,28 @@ def recording_callback(pop):
 
 obj = functools.partial(
     objective,
-    #network=network,
+    # network=network,
     env=env,
-    n_timesteps=n_timesteps,
+    n_episodes=n_episodes,
+    n_steps_per_episode = n_steps_per_episode,
     learning_rate=learning_rate,
     seed=seed,
 )
 
-#tracemalloc.start()
+# tracemalloc.start()
 
 start = time.time()
 cgp.evolve(
     pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback
 )
 end = time.time()
-print(f"Time of running element-wise:", end-start)
+print(f"Time elapsed:", end - start)
 
 max_fitness = history["fitness_champion"][-1]
 best_expr = pop.champion.to_sympy()
-#best_expr = best_expr.replace("x_0", "pre").replace("x_1", "post").replace("x_2, "weight")
+# best_expr = best_expr.replace("x_0", "pre").replace("x_1", "post").replace("x_2, "weight")
 # .replace("x_4", "reward")
-print(f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})  '
-      f'for {n_timesteps} timesteps per evaluation')
+print(
+    f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})  '
+    f"for {n_episodes} timesteps per evaluation"
+)

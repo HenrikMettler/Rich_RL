@@ -76,30 +76,43 @@ class Network(nn.Module):
 
         # ugly stuff to have data in correct shape
         n_repeats = hidden_activities.shape[0]
-        reward_repeated = self._repeat_unsqueeze_tensor(element=reward, n_repeats=n_repeats)
+        reward_repeated = self._repeat_unsqueeze_tensor(
+            element=reward, n_repeats=n_repeats
+        )
         hidden_activities = hidden_activities.unsqueeze(dim=1)
 
         # first layer update
         for idx_obs, observation_element in enumerate(observation):
 
             # ugly stuff to make the inputs right shape and dtype
-            observation_repeated = self._repeat_unsqueeze_tensor(element=observation_element,
-                                                                 n_repeats=n_repeats)
+            observation_repeated = self._repeat_unsqueeze_tensor(
+                element=observation_element, n_repeats=n_repeats
+            )
 
             weights = self.hidden_layer.weight[:, idx_obs]
             weights = weights.unsqueeze(dim=1)
-            update = self._calculate_update_weight_tensor(t=t, pre=observation_repeated,
-                                                          post=hidden_activities, weights=weights,
-                                                          rewards=reward_repeated, learning_rate=learning_rate)
+            update = self._calculate_update_weight_tensor(
+                t=t,
+                pre=observation_repeated,
+                post=hidden_activities,
+                weights=weights,
+                rewards=reward_repeated,
+                learning_rate=learning_rate,
+            )
             self.hidden_layer.weight[:, idx_obs] += update
 
         # second layer update
         output_activities_repeated = output_activities.repeat(n_repeats)
         output_activities_repeated = output_activities_repeated.unsqueeze(dim=1)
         weights = self.output_layer.weight.T
-        update = self._calculate_update_weight_tensor(t=t, pre=hidden_activities,
-                                                      post=output_activities_repeated, weights=weights,
-                                                      rewards=reward_repeated, learning_rate=learning_rate)
+        update = self._calculate_update_weight_tensor(
+            t=t,
+            pre=hidden_activities,
+            post=output_activities_repeated,
+            weights=weights,
+            rewards=reward_repeated,
+            learning_rate=learning_rate,
+        )
         self.output_layer.weight[:] += update.T
 
         """# element-wise implementation
@@ -115,17 +128,24 @@ class Network(nn.Module):
                                               output_weight, reward])[0]
         """
 
-    def _calculate_update_weight_tensor(self, t: torch.nn.Module, pre: torch.Tensor, post: torch.Tensor,
-                                        weights: torch.Tensor, rewards: torch.Tensor, learning_rate: float)\
-            -> torch.Tensor:
+    def _calculate_update_weight_tensor(
+        self,
+        t: torch.nn.Module,
+        pre: torch.Tensor,
+        post: torch.Tensor,
+        weights: torch.Tensor,
+        rewards: torch.Tensor,
+        learning_rate: float,
+    ) -> torch.Tensor:
 
         input_variables = torch.cat([pre, post, weights, rewards], dim=1)
         output = t(input_variables)
         update = learning_rate * output
         return update.squeeze(dim=1)
 
-    def _repeat_unsqueeze_tensor(self, element: Union[float, int],
-                                n_repeats: int, datatype=torch.float32) -> torch.Tensor:
+    def _repeat_unsqueeze_tensor(
+        self, element: Union[float, int], n_repeats: int, datatype=torch.float32
+    ) -> torch.Tensor:
         """ repeat scalar elements and unsqueeze them
 
         Parameters
