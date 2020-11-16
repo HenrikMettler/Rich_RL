@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import tracemalloc
 
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Union
 
 
 class Network(nn.Module):
@@ -61,37 +61,45 @@ class Network(nn.Module):
         reward: float,
         learning_rate: float,
     ) -> None:
+        """
 
+        :param f: Callable, update func for element-wise update
+        :param t: torch.nn.Module, update func as torch module
+        :param observation: numpy.ndarray, input (from env)
+        :param hidden_activities: torch.tensor,  activity of hidden-layer neurons
+        :param output_activities: torch.tensor activity of output-layer neurons
+        :param reward: float, reward in the trial
+        :param learning_rate: float, multiplication factor for update
+        :return: None
+        """
         # implementation with torch
 
         # ugly stuff to have data in correct shape
-        reward_repeated = torch.tensor(reward).repeat(hidden_activities.shape[0]).unsqueeze(dim=1)
+        n_repeats = hidden_activities.shape[0]
+        reward_repeated = self._repeat_unsqueeze_tensor(element=reward, n_repeats=n_repeats)
         hidden_activities = hidden_activities.unsqueeze(dim=1)
 
         # first layer update
         for idx_obs, observation_element in enumerate(observation):
 
             # ugly stuff to make the inputs right shape and dtype
-            observation_repeated = torch.tensor(observation_element, dtype=torch.float32).\
-                 repeat(hidden_activities.shape[0])
-            observation_repeated = observation_repeated.unsqueeze(dim=1)
+            observation_repeated = self._repeat_unsqueeze_tensor(element=observation_element,
+                                                                 n_repeats=n_repeats)
+
             weights = self.hidden_layer.weight[:, idx_obs]
             weights = weights.unsqueeze(dim=1)
-            input_variables = torch.cat([observation_repeated, hidden_activities,
-                                          weights, reward_repeated], dim=1)
-
-            output = t(input_variables).squeeze(dim=1)
-            update = learning_rate * output
+            update = self._calculate_update_weight_tensor(t=t, pre=observation_repeated,
+                                                          post=hidden_activities, weights=weights,
+                                                          rewards=reward_repeated, learning_rate=learning_rate)
             self.hidden_layer.weight[:, idx_obs] += update
 
         # second layer update
-        output_activities_repeated = output_activities.repeat(hidden_activities.shape[0])
+        output_activities_repeated = output_activities.repeat(n_repeats)
         output_activities_repeated = output_activities_repeated.unsqueeze(dim=1)
         weights = self.output_layer.weight.T
-        input_variables = torch.cat([hidden_activities, output_activities_repeated, weights, reward_repeated],
-                           dim=1)
-        output = t(input_variables)
-        update = learning_rate * output
+        update = self._calculate_update_weight_tensor(t=t, pre=hidden_activities,
+                                                      post=output_activities_repeated, weights=weights,
+                                                      rewards=reward_repeated, learning_rate=learning_rate)
         self.output_layer.weight[:] += update.T
 
         """# element-wise implementation
@@ -106,3 +114,34 @@ class Network(nn.Module):
             output_weight += learning_rate*f([hidden_activity, output_activities,
                                               output_weight, reward])[0]
         """
+
+    def _calculate_update_weight_tensor(self, t: torch.nn.Module, pre: torch.Tensor, post: torch.Tensor,
+                                        weights: torch.Tensor, rewards: torch.Tensor, learning_rate: float)\
+            -> torch.Tensor:
+
+        input_variables = torch.cat([pre, post, weights, rewards], dim=1)
+        output = t(input_variables)
+        update = learning_rate * output
+        return update.squeeze(dim=1)
+
+    def _repeat_unsqueeze_tensor(self, element: Union[float, int],
+                                n_repeats: int, datatype=torch.float32) -> torch.Tensor:
+        """ repeat scalar elements and unsqueeze them
+
+        Parameters
+        ----------
+        element: Union[float, int]
+            element to be repeated
+        n_repeats: int
+            number of times the element should be repeated
+        datatype:
+            desired datatype of the output
+
+        Return
+        ------
+        torch.Tensor of size n_repeats x 1, with all values equal to element
+            and converted to datatype
+        """
+        element_repeated = torch.tensor(element, dtype=datatype).repeat(n_repeats)
+        element_repeated_unsqueezed = element_repeated.unsqueeze(dim=1)
+        return element_repeated_unsqueezed
