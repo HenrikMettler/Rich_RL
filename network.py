@@ -53,7 +53,6 @@ class Network(nn.Module):
 
     def update_weights(
         self,
-        f: Callable,
         t: torch.nn.Module,
         observation: np.ndarray,
         hidden_activities: torch.Tensor,
@@ -63,7 +62,6 @@ class Network(nn.Module):
     ) -> None:
         """
 
-        :param f: Callable, update func for element-wise update
         :param t: torch.nn.Module, update func as torch module
         :param observation: numpy.ndarray, input (from env)
         :param hidden_activities: torch.tensor,  activity of hidden-layer neurons
