@@ -55,14 +55,6 @@ def inner_objective(
     env.close()
     cum_reward: float = np.mean(cum_reward_all_episodes)
 
-    # trace memory usage
-
-    snapshot = tracemalloc.take_snapshot()
-    top_stats = snapshot.statistics('lineno')
-
-    print("[ Top 3 ]")
-    for stat in top_stats[:3]:
-        print(stat)
 
     return cum_reward
 
@@ -152,7 +144,6 @@ obj = functools.partial(
     seed=seed,
 )
 
-tracemalloc.start()
 
 start = time.time()
 cgp.evolve(
