@@ -45,9 +45,13 @@ class Network(nn.Module):
 
         state = torch.as_tensor(observation).float().detach()
 
-        # linear activation function
-        hidden_activities: torch.Tensor = self.hidden_layer(state)
-        output_activities: torch.Tensor = self.output_layer(hidden_activities)
+        # tanh activation function as in Najarro & Risi
+        # (https://proceedings.neurips.cc/paper/2020/hash/
+        # ee23e7ad9b473ad072d57aaa9b2a5222-Abstract.html)
+        hidden_activities: torch.Tensor = torch.tanh(self.hidden_layer(state))
+        output_activities: torch.Tensor = torch.tanh(
+            self.output_layer(hidden_activities)
+        )
 
         return hidden_activities, output_activities
 

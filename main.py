@@ -41,10 +41,14 @@ def inner_objective(
             observation, reward, done, _ = env.step(action)
 
             # update the weights according to f
-            network.update_weights(t=t, observation=observation,
-                                   hidden_activities=hidden_activities,
-                                   output_activities=output_activities, reward=reward,
-                                   learning_rate=learning_rate)
+            network.update_weights(
+                t=t,
+                observation=observation,
+                hidden_activities=hidden_activities,
+                output_activities=output_activities,
+                reward=reward,
+                learning_rate=learning_rate,
+            )
             cum_reward_this_episode += reward
 
             if done:
@@ -54,7 +58,6 @@ def inner_objective(
 
     env.close()
     cum_reward: float = np.mean(cum_reward_all_episodes)
-
 
     return cum_reward
 
@@ -88,10 +91,15 @@ def objective(
             warnings.filterwarnings(
                 "ignore", message="invalid value encountered in double_scalars"
             )
-            individual.fitness = inner_objective(t=t, network=network, env=env,
-                                                 n_runs_per_individual=n_runs_per_individual,
-                                                 n_steps_per_run=n_steps_per_run,
-                                                 learning_rate=learning_rate, seed=seed)
+            individual.fitness = inner_objective(
+                t=t,
+                network=network,
+                env=env,
+                n_runs_per_individual=n_runs_per_individual,
+                n_steps_per_run=n_steps_per_run,
+                learning_rate=learning_rate,
+                seed=seed,
+            )
     except ZeroDivisionError:
         individual.fitness = -np.inf
 
@@ -127,12 +135,12 @@ env = gym.make("MountainCarContinuous-v0")
 # initialize a history
 history = {}
 history["fitness_champion"] = []
-#history["expression_champion"] = []
+# history["expression_champion"] = []
 
 
 def recording_callback(pop):
     history["fitness_champion"].append(pop.champion.fitness)
-    #history["expression_champion"].append(pop.champion.to_sympy())
+    # history["expression_champion"].append(pop.champion.to_sympy())
 
 
 obj = functools.partial(
