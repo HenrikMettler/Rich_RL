@@ -20,7 +20,6 @@ def inner_objective(
     env: gym.Env,
     n_runs_per_individual: int,
     n_steps_per_run: int,
-    learning_rate: float,
     seed: int,
 ) -> float:
 
@@ -47,7 +46,6 @@ def inner_objective(
                 hidden_activities=hidden_activities,
                 output_activities=output_activities,
                 reward=reward,
-                learning_rate=learning_rate,
             )
             cum_reward_this_episode += reward
 
@@ -64,7 +62,6 @@ def inner_objective(
 
 def objective(
     individual: cgp.IndividualSingleGenome,
-    env: gym.Env,
     n_runs_per_individual: int,
     n_steps_per_run: int,
     learning_rate: float,
@@ -73,14 +70,16 @@ def objective(
     if individual.fitness is not None:
         return individual
 
+    # environment initialization
+    env = gym.make('Pendulum-v0')
+
     # network initialization
     torch.manual_seed(seed=seed)
     n_inputs = env.observation_space.shape[0]
     n_hidden_layer = 100
     n_outputs = env.action_space.shape[0]
-    network = Network(
-        n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs
-    )
+    network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs,
+                      learning_rate=learning_rate)
 
     t = individual.to_torch()
     try:
@@ -91,15 +90,9 @@ def objective(
             warnings.filterwarnings(
                 "ignore", message="invalid value encountered in double_scalars"
             )
-            individual.fitness = inner_objective(
-                t=t,
-                network=network,
-                env=env,
-                n_runs_per_individual=n_runs_per_individual,
-                n_steps_per_run=n_steps_per_run,
-                learning_rate=learning_rate,
-                seed=seed,
-            )
+            individual.fitness = inner_objective(t=t, network=network, env=env,
+                                                 n_runs_per_individual=n_runs_per_individual,
+                                                 n_steps_per_run=n_steps_per_run, seed=seed)
     except ZeroDivisionError:
         individual.fitness = -np.inf
 
@@ -122,15 +115,10 @@ genome_params = {
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
 ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
-evolve_params = {"max_generations": 1000, "min_fitness": n_runs_per_individual * 90}
-# MountainCarContinuous v0 solved with reward 90
-# (https://github.com/openai/gym/wiki/MountainCarContinuous-v0)
+evolve_params = {"max_generations": 1000, "min_fitness": 0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
 ea = cgp.ea.MuPlusLambda(**ea_params)
-
-# environment initialization
-env = gym.make("MountainCarContinuous-v0")
 
 # initialize a history
 history = {}
@@ -145,13 +133,11 @@ def recording_callback(pop):
 
 obj = functools.partial(
     objective,
-    env=env,
     n_runs_per_individual=n_runs_per_individual,
     n_steps_per_run=n_steps_per_run,
     learning_rate=learning_rate,
     seed=seed,
 )
-
 
 start = time.time()
 cgp.evolve(
