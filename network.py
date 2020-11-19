@@ -14,7 +14,7 @@ GAMMA: float = 0.9
 class Network(nn.Module):
     """ Network class"""
 
-    def __init__(self, n_inputs: int, n_hidden_layer: int, n_outputs: int, learning_rate: float)\
+    def __init__(self, n_inputs: int, n_hidden: int, n_outputs: int, learning_rate: float)\
             -> None:
         """ Init function
         
@@ -31,8 +31,8 @@ class Network(nn.Module):
 
         super(Network, self).__init__()
 
-        self.hidden_layer = nn.Linear(n_inputs, n_hidden_layer, bias=False) # Todo: train biases as well?
-        self.output_layer = nn.Linear(n_hidden_layer, n_outputs, bias=False)
+        self.hidden_layer = nn.Linear(n_inputs, n_hidden, bias=False) # Todo: train biases as well?
+        self.output_layer = nn.Linear(n_hidden, n_outputs, bias=False)
 
         self.learning_rate = learning_rate
 
@@ -176,7 +176,7 @@ class Network(nn.Module):
         element_repeated_unsqueezed = element_repeated.unsqueeze(dim=1)
         return element_repeated_unsqueezed
 
-    def update_with_policy(self, rewards: np.ndarray, log_probs: np.ndarray):
+    def update_with_policy(self, rewards: List[int], log_probs: List[int]):
         """adapted from: https://medium.com/@thechrisyoon/
         deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
         discounted_rewards_list: List[float] = []
@@ -204,4 +204,5 @@ class Network(nn.Module):
         self.optimizer.zero_grad()
         policy_gradient.backward()
         self.optimizer.step()
+
 

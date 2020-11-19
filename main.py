@@ -76,9 +76,9 @@ def objective(
     # network initialization
     torch.manual_seed(seed=seed)
     n_inputs = env.observation_space.shape[0]
-    n_hidden_layer = 100
+    n_hidden = 100
     n_outputs = env.action_space.shape[0]
-    network = Network(n_inputs=n_inputs, n_hidden_layer=n_hidden_layer, n_outputs=n_outputs,
+    network = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                       learning_rate=learning_rate)
 
     t = individual.to_torch()
@@ -102,7 +102,7 @@ def objective(
 seed = 1000
 n_runs_per_individual = 3
 n_steps_per_run = 1000
-learning_rate = 0.05
+learning_rate = 3e-4
 
 # population and evolutionary algorithm initialization
 population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
