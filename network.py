@@ -1,15 +1,21 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import tracemalloc
 
-from typing import Callable, Tuple, Union
+from typing import Callable, List, Tuple, Union
+
+
+# Reward discount factor
+GAMMA: float = 0.9
 
 
 class Network(nn.Module):
     """ Network class"""
 
-    def __init__(self, n_inputs: int, n_hidden_layer: int, n_outputs: int) -> None:
+    def __init__(self, n_inputs: int, n_hidden_layer: int, n_outputs: int, learning_rate: float)\
+            -> None:
         """ Init function
         
         Parameters
@@ -20,12 +26,18 @@ class Network(nn.Module):
             Number of hidden layer neurons
         n_outputs: 
             Number of output neurons (should be the dimension of the action space)
+            :param learning_rate:
         """
 
         super(Network, self).__init__()
 
-        self.hidden_layer = nn.Linear(n_inputs, n_hidden_layer, bias=False)
+        self.hidden_layer = nn.Linear(n_inputs, n_hidden_layer, bias=False) # Todo: train biases as well?
         self.output_layer = nn.Linear(n_hidden_layer, n_outputs, bias=False)
+
+        self.learning_rate = learning_rate
+
+        # optimizer for baseline with policy gradient
+        self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, observation: np.array) -> Tuple[torch.Tensor, torch.Tensor]:
         """ Compute a forward pass in the network and return output and hidden activities
@@ -62,7 +74,6 @@ class Network(nn.Module):
         hidden_activities: torch.Tensor,
         output_activities: torch.Tensor,
         reward: float,
-        learning_rate: float,
     ) -> None:
         """
 
@@ -99,7 +110,6 @@ class Network(nn.Module):
                 post=hidden_activities,
                 weights=weights,
                 rewards=reward_repeated,
-                learning_rate=learning_rate,
             )
             self.hidden_layer.weight[:, idx_obs] += update
 
@@ -113,7 +123,6 @@ class Network(nn.Module):
             post=output_activities_repeated,
             weights=weights,
             rewards=reward_repeated,
-            learning_rate=learning_rate,
         )
         self.output_layer.weight[:] += update.T
 
@@ -137,12 +146,11 @@ class Network(nn.Module):
         post: torch.Tensor,
         weights: torch.Tensor,
         rewards: torch.Tensor,
-        learning_rate: float,
     ) -> torch.Tensor:
 
         input_variables = torch.cat([pre, post, weights, rewards], dim=1)
         output = t(input_variables)
-        update = learning_rate * output
+        update = self.learning_rate * output
         return update.squeeze(dim=1)
 
     def _repeat_unsqueeze_tensor(
@@ -167,3 +175,33 @@ class Network(nn.Module):
         element_repeated = torch.tensor(element, dtype=datatype).repeat(n_repeats)
         element_repeated_unsqueezed = element_repeated.unsqueeze(dim=1)
         return element_repeated_unsqueezed
+
+    def update_with_policy(self, rewards: np.ndarray, log_probs: np.ndarray):
+        """adapted from: https://medium.com/@thechrisyoon/
+        deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
+        discounted_rewards_list: List[float] = []
+
+        for t in range(len(rewards)):
+            discounted_reward: float = 0
+            exponent: int = 0
+            for reward in rewards:
+                discounted_reward += GAMMA**exponent * reward
+                exponent += 1
+            discounted_rewards_list.append(discounted_reward)
+
+        discounted_rewards: torch.Tensor = torch.Tensor(discounted_rewards_list)
+        # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+        discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / \
+                             (discounted_rewards.std() + 1e-9)
+
+
+        policy_gradient_list: List[float] = []
+        for log_prob, discounted_reward in zip(log_probs, discounted_rewards):
+            # -, since we do gradient ascent on the expected discounted rewards, not descent
+            policy_gradient_list.append(-log_prob*discounted_reward)
+
+        policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+        self.optimizer.zero_grad()
+        policy_gradient.backward()
+        self.optimizer.step()
+
