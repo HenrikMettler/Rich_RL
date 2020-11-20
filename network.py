@@ -60,10 +60,9 @@ class Network(nn.Module):
         # tanh activation function as in Najarro & Risi
         # (https://proceedings.neurips.cc/paper/2020/hash/
         # ee23e7ad9b473ad072d57aaa9b2a5222-Abstract.html)
-        hidden_activities: torch.Tensor = torch.tanh(self.hidden_layer(state))
-        output_activities: torch.Tensor = torch.tanh(
-            self.output_layer(hidden_activities)
-        )
+        hidden_activities: torch.Tensor = torch.relu(self.hidden_layer(state))
+        output_activities: torch.Tensor = torch.softmax(
+            self.output_layer(hidden_activities), dim=0)
 
         return hidden_activities, output_activities
 
@@ -198,7 +197,7 @@ class Network(nn.Module):
         policy_gradient_list: List[float] = []
         for log_prob, discounted_reward in zip(log_probs, discounted_rewards):
             # -, since we do gradient ascent on the expected discounted rewards, not descent
-            policy_gradient_list.append(-log_prob*discounted_reward)
+            policy_gradient_list.append(log_prob*discounted_reward)
 
         policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
         self.optimizer.zero_grad()
