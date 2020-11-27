@@ -39,7 +39,7 @@ class Network(nn.Module):
         self.learning_rate = learning_rate
 
         # optimizer for baseline with policy gradient
-        self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
 
     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """ Compute a forward pass in the network and return output and hidden activities
@@ -66,10 +66,10 @@ class Network(nn.Module):
 
         return hidden_activities, output_activities
 
-    def get_action(self, state: np.ndarray, rng: np.random.RandomState) -> Tuple[np.ndarray, torch.Tensor]:
+    def get_action(self, state: np.ndarray, rng: np.random.Generator) -> Tuple[np.ndarray, torch.Tensor]:
         state = torch.from_numpy(state).float().unsqueeze(0)
         _, probs = self.forward(Variable(state))
-        selected_action = np.random.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
+        selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
         log_prob = torch.log(probs.squeeze(0)[selected_action])
         return selected_action, log_prob
 
@@ -95,8 +95,8 @@ def update_weights(
     # implementation with torch
 
     # ugly stuff to have data in correct shape
-    n_repeats = hidden_activities.shape[0]
-    reward_repeated = network._repeat_unsqueeze_tensor(
+    n_repeats = hidden_activities.shape[-1]
+    reward_repeated = _repeat_unsqueeze_tensor(network=network,
         element=reward, n_repeats=n_repeats
     )
     hidden_activities = hidden_activities.unsqueeze(dim=1)
@@ -105,13 +105,14 @@ def update_weights(
     for idx_obs, observation_element in enumerate(observation):
 
         # ugly stuff to make the inputs right shape and dtype
-        observation_repeated = network._repeat_unsqueeze_tensor(
+        observation_repeated = _repeat_unsqueeze_tensor(network=network,
             element=observation_element, n_repeats=n_repeats
         )
 
         weights = network.hidden_layer.weight[:, idx_obs]
         weights = weights.unsqueeze(dim=1)
-        update = network._calculate_update_weight_tensor(
+        update = _calculate_update_weight_tensor(
+            network=network,
             t=t,
             pre=observation_repeated,
             post=hidden_activities,
@@ -124,12 +125,13 @@ def update_weights(
     output_activities_repeated = output_activities.repeat(n_repeats)
     output_activities_repeated = output_activities_repeated.unsqueeze(dim=1)
     weights = network.output_layer.weight.T
-    update = network._calculate_update_weight_tensor(
+    update = _calculate_update_weight_tensor(
+        network=network,
         t=t,
         pre=hidden_activities,
         post=output_activities_repeated,
         weights=weights,
-        rewards=reward_repeated,
+        rewards=reward_repeated
     )
     network.output_layer.weight[:] += update.T
 
@@ -146,6 +148,7 @@ def update_weights(
                                           output_weight, reward])[0]
     """
 
+
 def _calculate_update_weight_tensor(
     network,
     t: torch.nn.Module,
@@ -159,6 +162,7 @@ def _calculate_update_weight_tensor(
     output = t(input_variables)
     update = network.learning_rate * output
     return update.squeeze(dim=1)
+
 
 def _repeat_unsqueeze_tensor(
     network, element: Union[float, int], n_repeats: int, datatype=torch.float32
@@ -184,9 +188,7 @@ def _repeat_unsqueeze_tensor(
     return element_repeated_unsqueezed
 
 
-def update_with_policy(network: Network, rewards: List[float], log_probs: List[float]):
-    """adapted from: https://medium.com/@thechrisyoon/
-    deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
+def calculate_discounted_reward(rewards: List[float]):
     discounted_rewards_list: List[float] = []
 
     for t in range(len(rewards)):
@@ -198,15 +200,31 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[f
         discounted_rewards_list.append(discounted_reward)
 
     discounted_rewards: torch.Tensor = torch.Tensor(discounted_rewards_list)
-    # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
-    discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / \
-                         (discounted_rewards.std() + 1e-9)
+    return discounted_rewards
 
 
-    policy_gradient_list: List[float] = []
+def normalize_discounted_rewards(discounted_rewards: torch.Tensor):
+    return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-9)
+
+
+def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discounted_rewards: torch.Tensor):
+    policy_gradient_list: List[torch.Tensor] = []
     for log_prob, discounted_reward in zip(log_probs, discounted_rewards):
         # -, since we do gradient ascent on the expected discounted rewards, not descent
         policy_gradient_list.append(-log_prob*discounted_reward)
+    return policy_gradient_list
+
+
+def update_with_policy(network: Network, rewards: List[float], log_probs: List[torch.Tensor]):
+    """adapted from: https://medium.com/@thechrisyoon/
+    deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
+
+    discounted_rewards = calculate_discounted_reward(rewards)
+    # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+    discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+
+    policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
+                                                                  discounted_rewards=discounted_rewards)
 
     network.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
@@ -214,3 +232,11 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[f
     network.optimizer.step()
 
 
+def update_weight_with_policy_gradient(network: Network, rewards: List[float], log_probs: List[torch.Tensor]):
+    """ mimic unsupervised learning with gradient"""
+
+    discounted_rewards = calculate_discounted_reward(rewards)
+    # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+    discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+    policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
+                                                                  discounted_rewards=discounted_rewards)

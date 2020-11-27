@@ -9,9 +9,10 @@ import tracemalloc
 
 import cgp
 
+from torch.autograd import Variable
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
 
-from network import Network
+from network import Network, update_weights
 
 
 def inner_objective(
@@ -21,26 +22,29 @@ def inner_objective(
     n_runs_per_individual: int,
     n_steps_per_run: int,
     seed: int,
+    rng: np.random.Generator,
 ) -> float:
 
     env.seed(seed)
 
     cum_reward_all_episodes: List = []
     for _ in range(n_runs_per_individual):
-        observation: np.array = env.reset()
+        state = env.reset()
         cum_reward_this_episode: float = 0
 
         for _ in range(n_steps_per_run):
             # compute forward pass and take a step
-            hidden_activities, output_activities = network.forward(observation)
-            action: np.ndarray = output_activities.detach().numpy()  # Todo: adapt for more than one output
+            state = torch.from_numpy(state).float().unsqueeze(0)
+            hidden_activities, output_activities = network.forward(Variable(state))
+            action = rng.choice(network.num_actions, p=np.squeeze(output_activities.detach().numpy()))
             if np.isnan(action):  # return early if actions diverge
                 return -np.inf
 
             observation, reward, done, _ = env.step(action)
 
             # update the weights according to f
-            network.update_weights(
+            update_weights(
+                network=network,
                 t=t,
                 observation=observation,
                 hidden_activities=hidden_activities,
@@ -66,18 +70,23 @@ def objective(
     n_steps_per_run: int,
     learning_rate: float,
     seed: int,
+    rng: np.random.Generator,
 ):
     if individual.fitness is not None:
         return individual
 
     # environment initialization
-    env = gym.make('Pendulum-v0')
+    env = gym.make('CartPole-v0')
 
     # network initialization
     torch.manual_seed(seed=seed)
     n_inputs = env.observation_space.shape[0]
     n_hidden = 100
-    n_outputs = env.action_space.shape[0]
+    if isinstance(env.action_space, gym.spaces.Box):
+        n_outputs = env.action_space.shape[0]
+    else:
+        n_outputs: int = env.action_space.n
+
     network = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                       learning_rate=learning_rate)
 
@@ -92,7 +101,8 @@ def objective(
             )
             individual.fitness = inner_objective(t=t, network=network, env=env,
                                                  n_runs_per_individual=n_runs_per_individual,
-                                                 n_steps_per_run=n_steps_per_run, seed=seed)
+                                                 n_steps_per_run=n_steps_per_run, seed=seed,
+                                                 rng=rng)
     except ZeroDivisionError:
         individual.fitness = -np.inf
 
@@ -103,6 +113,7 @@ seed = 1000
 n_runs_per_individual = 3
 n_steps_per_run = 1000
 learning_rate = 3e-4
+rng = np.random.default_rng(seed=seed)
 
 # population and evolutionary algorithm initialization
 population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
@@ -137,6 +148,7 @@ obj = functools.partial(
     n_steps_per_run=n_steps_per_run,
     learning_rate=learning_rate,
     seed=seed,
+    rng=rng
 )
 
 start = time.time()

@@ -28,36 +28,28 @@ if env_is_box:
     n_outputs: int = env.action_space.shape[0]
 else:
     n_outputs: int = env.action_space.n
-learning_rate: float = 3e-4
+learning_rate: float = 2e-4 #3e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                      learning_rate=learning_rate)
 
 
-def get_stoch_action_from_output(output_activity: torch.Tensor) -> int:
-    softmax = torch.nn.Softmax(dim=0)  # adds a second non-linearity -> too much smoothing?
-    output_activity = softmax(output_activity)
-    out_numpy = output_activity.detach().numpy()
-    return rng.choice(output_activity.shape[0],
-                            p=np.squeeze(out_numpy))
-
 n_steps_per_episode: List[int] = []
 
 for episode in range(n_epsisodes):
     state = env.reset()
-    log_probs: List[float] = []
+    log_probs: List[torch.Tensor] = []
     rewards: List[float] = []
 
     for steps in range(n_steps_max):
         #  env.render()
-        #_, output_activity = policy_net.forward(observation)
         if env_cont_flag:
             raise NotImplementedError  # Todo: what is the continuous equivalent?
             # -> see Lillicrap et al. Cont. Control paper
         else:
             action, log_prob = policy_net.get_action(state, rng)
 
-        new_state, reward, done, _ = env.step(action)
+        new_state, reward, done, _ = env.step(action)  # todo replace done with
         log_probs.append(log_prob)
         rewards.append(reward)
 
