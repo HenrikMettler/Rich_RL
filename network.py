@@ -232,7 +232,7 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[t
     network.optimizer.step()
 
 
-def update_weight_with_policy_gradient(network: Network, rewards: List[float], log_probs: List[torch.Tensor]):
+def update_weights_with_policy_gradient(network: Network, rewards: List[float], log_probs: List[torch.Tensor]):
     """ mimic unsupervised learning with gradient"""
 
     discounted_rewards = calculate_discounted_reward(rewards)
@@ -240,3 +240,7 @@ def update_weight_with_policy_gradient(network: Network, rewards: List[float], l
     discounted_rewards = normalize_discounted_rewards(discounted_rewards)
     policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
                                                                   discounted_rewards=discounted_rewards)
+
+
+def update_weights_online(network: Network, reward: float, log_probs: torch.Tensor):
+    raise NotImplementedError

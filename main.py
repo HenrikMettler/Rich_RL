@@ -42,7 +42,7 @@ def inner_objective(
 
             observation, reward, done, _ = env.step(action)
 
-            # update the weights according to f
+            # update the weights according to t
             update_weights(
                 network=network,
                 t=t,
@@ -116,7 +116,7 @@ learning_rate = 3e-4
 rng = np.random.default_rng(seed=seed)
 
 # population and evolutionary algorithm initialization
-population_params = {"n_parents": 1, "mutation_rate": 0.03, "seed": seed}
+population_params = {"n_parents": 1, "seed": seed}
 genome_params = {
     "n_inputs": 4,  # pre, post, weight, reward
     "n_outputs": 1,
@@ -125,7 +125,7 @@ genome_params = {
     "levels_back": None,
     "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
-ea_params = {"n_offsprings": 4, "tournament_size": 1, "n_processes": 1}
+ea_params = {"n_offsprings": 4, "mutation_rate": 0.03, "n_processes": 1}
 evolve_params = {"max_generations": 1000, "min_fitness": 0}
 
 pop = cgp.Population(**population_params, genome_params=genome_params)
