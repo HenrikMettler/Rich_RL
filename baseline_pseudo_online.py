@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import GAMMA, Network, update_weights_online
+from network import GAMMA, Network, calc_el_traces, update_weights_pseudo_online
 from typing import Callable, List, Tuple, Union
 
 seed = 123
@@ -40,15 +40,32 @@ for episode in range(n_epsisodes):
     state = env.reset()
     log_probs: List[torch.Tensor] = []
     rewards: List[float] = []
+    probs: List[float] = []
+    actions: List[int] = []
+    hidden_activities_all = []
 
     for steps in range(n_steps_max):
-        action, log_prob = online_net.get_action(state, rng)
-
-        new_state, reward, done, _ = env.step(action)  # todo replace done with
+        action, log_prob, prob, hidden_activities = online_net.get_action(state, rng)
+        new_state, reward, done, _ = env.step(action)
         log_probs.append(log_prob)
         rewards.append(reward)
+        probs.append(prob)
+        actions.append(action)
+        hidden_activities_all.append(hidden_activities)
 
-        update_weights_online(network=online_net, rewards=rewards, log_probs=log_probs)
+        if done:
+            el_traces = calc_el_traces(GAMMA,probs, hidden_activities_all, actions=actions,
+                                       n_hidden=n_hidden, n_outputs=n_outputs,
+                                       n_timesteps=steps+1) #+1 offset
+            update_weights_pseudo_online(network=online_net, rewards=rewards, log_probs=log_probs,
+                                         el_traces=el_traces)
+
+            n_steps_per_episode.append(steps)
+
+            if episode % 100 == 0:
+                print(f"episode {episode}, n_steps: {steps}\n")
+
+            break
         state = new_state
 
 n_steps_smoothed = []

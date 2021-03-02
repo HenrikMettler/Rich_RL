@@ -266,5 +266,49 @@ def update_output_weights_without_autograd(network: Network, discounted_rewards:
             weight_vector += updates
 
 
-def update_weights_online(network: Network, reward: float, log_probs: torch.Tensor):
-    raise NotImplementedError
+def update_weights_pseudo_online(network: Network, rewards: List[float],
+                                 log_probs: List[torch.Tensor], el_traces):
+
+
+    discounted_rewards = calculate_discounted_reward(rewards)
+    # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+    discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+
+    policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
+    discounted_rewards = discounted_rewards)
+
+    network.optimizer.zero_grad()
+    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+    policy_gradient.backward()
+    network.optimizer.step()
+
+    # update output weights
+    with torch.no_grad():
+        for idx_action, weight_vector in enumerate(network.output_layer.weight):
+            updates = torch.zeros(size=weight_vector.size())
+            for idx_time in range(len(rewards)):
+                updates += rewards[idx_time]*el_traces[idx_action,:,idx_time]
+            weight_vector += network.learning_rate * updates
+
+
+def calc_el_traces(GAMMA, probs, hidden_activities, actions, n_hidden, n_outputs, n_timesteps):
+    el_traces = torch.zeros([n_outputs, n_hidden, n_timesteps])
+    # implementation of eq 3
+    # for t=0
+    for idx_action in range(n_outputs):
+        el_traces[idx_action, :, 0] = _calc_el_elements(actions[0], idx_action, probs[0], hidden_activities[0])
+
+    for idx_time in range(1,n_timesteps):
+        for idx_action in range(n_outputs):
+            el_traces[idx_action, : , idx_time] = GAMMA*el_traces[idx_action, :, idx_time-1] + \
+                                                  _calc_el_elements(actions[idx_time], idx_action,
+                                                                    probs[idx_time],
+                                                                    hidden_activities[idx_time])
+    return el_traces
+
+
+def _calc_el_elements(action, idx_action, probs, hidden_activities):
+    if idx_action == action:
+        return (1-probs[:,idx_action])*hidden_activities
+    else:
+        return (0-probs[:,idx_action])*hidden_activities
