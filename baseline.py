@@ -1,10 +1,13 @@
 import gym
 import torch
+import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 
 from network import GAMMA, Network, update_with_policy
 from typing import Callable, List, Tuple, Union
+
+use_autograd_for_output = False
 
 seed = 123
 torch.manual_seed(seed=seed)
@@ -31,15 +34,17 @@ else:
 learning_rate: float = 2e-4 #3e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
-                     learning_rate=learning_rate)
-
+                     learning_rate=learning_rate, use_autograd_for_output=use_autograd_for_output)
 
 n_steps_per_episode: List[int] = []
 
 for episode in range(n_epsisodes):
     state = env.reset()
     log_probs: List[torch.Tensor] = []
+    probs: List[float] = []
+    actions: List[int] = []
     rewards: List[float] = []
+    hidden_activities_all = []
 
     for steps in range(n_steps_max):
         #  env.render()
@@ -47,14 +52,19 @@ for episode in range(n_epsisodes):
             raise NotImplementedError  # Todo: what is the continuous equivalent?
             # -> see Lillicrap et al. Cont. Control paper
         else:
-            action, log_prob = policy_net.get_action(state, rng)
+            action, log_prob, prob, hidden_activities = policy_net.get_action(state, rng)
 
-        new_state, reward, done, _ = env.step(action)  # todo replace done with
+        new_state, reward, done, _ = env.step(action)
         log_probs.append(log_prob)
+        probs.append(prob)
+        actions.append(action)
         rewards.append(reward)
+        hidden_activities_all.append(hidden_activities)
 
         if done:
-            update_with_policy(network=policy_net, rewards=rewards, log_probs=log_probs)
+            update_with_policy(network=policy_net, rewards=rewards, log_probs=log_probs,
+                               use_autograd_for_output=use_autograd_for_output, actions=actions,
+                               probs=probs, hidden_activities=hidden_activities_all)
             n_steps_per_episode.append(steps)
 
             if episode % 100 == 0:
