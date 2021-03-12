@@ -34,7 +34,7 @@ class Network(nn.Module):
             Whether to use autograd for the output layer parameters. Defaults to true
         """
 
-        super(Network, self).__init__()
+        super().__init__()
         self.num_actions = n_outputs
 
         self.hidden_layer = nn.Linear(n_inputs, n_hidden) # Todo: train biases as well?
@@ -252,7 +252,7 @@ def update_output_weights_without_autograd(network: Network, discounted_rewards:
                                            log_probs: List[torch.Tensor], probs, actions,
                                            hidden_activities):
     """ manual update of output weights"""
-    with torch.no_grad(): # to prevent interference with back
+    with torch.no_grad(): # to prevent interference with backward
         lr = network.learning_rate
         for idx_action, weight_vector in enumerate(network.output_layer.weight):
             updates = torch.zeros(size=weight_vector.size())
@@ -312,3 +312,30 @@ def _calc_el_elements(action, idx_action, probs, hidden_activities):
         return (1-probs[:,idx_action])*hidden_activities
     else:
         return (0-probs[:,idx_action])*hidden_activities
+
+
+def update_el_traces(el_traces, GAMMA, prob, hidden_activities, action):
+    el_traces = GAMMA * el_traces
+    current_el_traces = torch.zeros(el_traces.shape)
+    for idx_action in range(el_traces.size(0)):
+        current_el_traces[idx_action,:] = _calc_el_elements(action, idx_action, prob,
+                                                            hidden_activities)
+
+    el_traces += current_el_traces
+    return el_traces
+
+
+def update_weights_online(network, reward,  el_traces, log_prob, discounted_reward):
+    policy_gradient = log_prob * discounted_reward
+
+    network.optimizer.zero_grad()
+    policy_gradient.backward()
+    network.optimizer.step()
+
+    # update output weights
+    with torch.no_grad():
+        for idx_action, weight_vector in enumerate(network.output_layer.weight):
+            updates = reward*el_traces[idx_action,:]
+            weight_vector += network.learning_rate * updates
+
+

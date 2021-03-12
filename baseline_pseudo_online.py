@@ -78,5 +78,7 @@ plt.plot(n_steps_per_episode, label='Duration')
 plt.plot(n_steps_smoothed, label='Smoothed Duration')
 plt.xlabel('Episode')
 plt.ylabel('Duration')
+plt.title(f"Using equation 4 for output layer update")
 
 plt.show()
+a=1

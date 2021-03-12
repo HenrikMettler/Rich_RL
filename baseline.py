@@ -1,13 +1,12 @@
 import gym
 import torch
-import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 
 from network import GAMMA, Network, update_with_policy
 from typing import Callable, List, Tuple, Union
 
-use_autograd_for_output = False
+use_autograd_for_output = True
 
 seed = 123
 torch.manual_seed(seed=seed)
@@ -16,7 +15,7 @@ rng = np.random.default_rng(seed=seed)
 n_epsisodes: int = 5000
 n_steps_max: int = 10000
 
-env = gym.make('CartPole-v0')  # Pendulum-v0
+env = gym.make('CarRacing-v0')
 if isinstance(env.action_space, gym.spaces.Box):
     env_is_box = True
 else:
@@ -71,7 +70,6 @@ for episode in range(n_epsisodes):
                 print(f"episode {episode}, n_steps: {steps}\n")
 
             break
-
         state = new_state
 
 n_steps_smoothed = []
@@ -84,5 +82,7 @@ plt.plot(n_steps_per_episode, label='Duration')
 plt.plot(n_steps_smoothed, label='Smoothed Duration')
 plt.xlabel('Episode')
 plt.ylabel('Duration')
+plt.title(f"Using equation 2 for output layer update: { not use_autograd_for_output}")
 
 plt.show()
+a = 1
