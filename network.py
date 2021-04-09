@@ -228,7 +228,7 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[t
     """adapted from: https://medium.com/@thechrisyoon/
     deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
 
-    discounted_rewards = calculate_discounted_reward(rewards)
+    discounted_rewards = calculate_discounted_rewards(rewards)
     # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
     discounted_rewards = normalize_discounted_rewards(discounted_rewards)
 
@@ -238,8 +238,8 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[t
     network.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
     policy_gradient.backward()
+    #import ipdb; ipdb.set_trace()
     network.optimizer.step()
-    import ipdb; ipdb.set_trace()
 
     if not use_autograd_for_output:
         update_output_weights_without_autograd(network, discounted_rewards, log_probs, probs,
@@ -255,11 +255,15 @@ def update_output_weights_without_autograd(network: Network, discounted_rewards:
         for idx_action, weight_vector in enumerate(network.output_layer.weight):
             updates = compute_weight_update_equation2(weight_vector, actions, idx_action,
                                                        discounted_rewards, probs, hidden_activities)
-            weight_vector += lr* updates
+            weight_vector -= lr* updates
 
 
 def compute_weight_update_equation2(weight_vector, actions, idx_action, discounted_rewards,
                                     probs, hidden_activities):
+
+    assert len(actions) == len(discounted_rewards)
+    assert len(actions) == len(probs)
+    assert len(actions) == len(hidden_activities)
 
     updates = torch.zeros(size=weight_vector.size())
     for idx_time, action in enumerate(actions):
@@ -270,7 +274,7 @@ def compute_weight_update_equation2(weight_vector, actions, idx_action, discount
         update = discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action]) * \
                  hidden_activities[idx_time]
         updates += update.squeeze()
-    return updates
+    return -updates
 
 
 def update_weights_pseudo_online(network: Network, rewards: List[float],
