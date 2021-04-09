@@ -194,18 +194,15 @@ def _repeat_unsqueeze_tensor(
     return element_repeated_unsqueezed
 
 
-def calculate_discounted_reward(rewards: List[float], gamma=0.9):
-    discounted_rewards_list: List[float] = []
+def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
+    rewards = torch.Tensor(rewards)
+    N = len(rewards)
+    discounted_rewards = torch.empty(N)
 
-    for t in range(len(rewards)):
-        discounted_reward: float = 0
-        exponent: int = 0
-        for reward in rewards[t:]:
-            discounted_reward += gamma**exponent * reward
-            exponent += 1
-        discounted_rewards_list.append(discounted_reward)
+    for t in range(N):
+        gamma_factor = gamma**torch.arange(N-t, dtype=torch.float)
+        discounted_rewards[t] = gamma_factor @ rewards[t:]
 
-    discounted_rewards: torch.Tensor = torch.Tensor(discounted_rewards_list)
     return discounted_rewards
 
 
@@ -242,6 +239,7 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[t
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
     policy_gradient.backward()
     network.optimizer.step()
+    import ipdb; ipdb.set_trace()
 
     if not use_autograd_for_output:
         update_output_weights_without_autograd(network, discounted_rewards, log_probs, probs,

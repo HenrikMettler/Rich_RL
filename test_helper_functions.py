@@ -1,24 +1,24 @@
 import torch
 import numpy as np
 import pytest
-from network import normalize_discounted_rewards, calculate_discounted_reward
+from network import normalize_discounted_rewards, calculate_discounted_rewards
 
 
-def test_calculate_discounted_reward():
+def test_calculate_discounted_rewards():
     gamma = 0.9
 
     rewards = [0.]
-    assert calculate_discounted_reward(rewards, gamma).numpy() == pytest.approx(np.array([0.]))
+    assert calculate_discounted_rewards(rewards, gamma).numpy() == pytest.approx(np.array([0.]))
 
     rewards = [0.,1.]
-    assert calculate_discounted_reward(rewards, gamma) == pytest.approx(np.array([gamma, 1.]))
+    assert calculate_discounted_rewards(rewards, gamma) == pytest.approx(np.array([gamma, 1.]))
 
     rewards = [0., 0. , 1.]
-    assert calculate_discounted_reward(rewards, gamma) == pytest.approx(np.array([gamma**2, gamma, 1.]))
+    assert calculate_discounted_rewards(rewards, gamma) == pytest.approx(np.array([gamma**2, gamma, 1.]))
 
     rewards = [0.25, 0.5, 1.]
     expected_rewards = np.array([0.25+ 0.5*gamma + gamma**2, 0.5 + gamma, 1.])
-    assert calculate_discounted_reward(rewards, gamma) == pytest.approx(expected_rewards)
+    assert calculate_discounted_rewards(rewards, gamma) == pytest.approx(expected_rewards)
 
 
 def test_normalize_discounted_rewards():
