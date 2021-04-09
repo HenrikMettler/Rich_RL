@@ -3,13 +3,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import tracemalloc
 
 from torch.autograd import Variable
 from typing import Callable, List, Tuple, Union
-
-# Reward discount factor
-GAMMA: float = 0.9
 
 
 class Network(nn.Module):
@@ -198,14 +194,14 @@ def _repeat_unsqueeze_tensor(
     return element_repeated_unsqueezed
 
 
-def calculate_discounted_reward(rewards: List[float]):
+def calculate_discounted_reward(rewards: List[float], gamma=0.9):
     discounted_rewards_list: List[float] = []
 
     for t in range(len(rewards)):
         discounted_reward: float = 0
         exponent: int = 0
         for reward in rewards[t:]:
-            discounted_reward += GAMMA**exponent * reward
+            discounted_reward += gamma**exponent * reward
             exponent += 1
         discounted_rewards_list.append(discounted_reward)
 
@@ -214,7 +210,11 @@ def calculate_discounted_reward(rewards: List[float]):
 
 
 def normalize_discounted_rewards(discounted_rewards: torch.Tensor):
-    return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-9)
+    if len(discounted_rewards) == 0:
+        raise RuntimeError("Length of discounted rewards must be non-zero")
+    elif len(discounted_rewards) == 1:
+        return torch.Tensor([0.])
+    return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
 
 
 def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discounted_rewards: torch.Tensor):
@@ -255,20 +255,28 @@ def update_output_weights_without_autograd(network: Network, discounted_rewards:
     with torch.no_grad(): # to prevent interference with backward
         lr = network.learning_rate
         for idx_action, weight_vector in enumerate(network.output_layer.weight):
-            updates = torch.zeros(size=weight_vector.size())
-            for idx_time, action in enumerate(actions):
-                if idx_action == action:
-                    kroenecker = 1
-                else:
-                    kroenecker = 0
-                update = discounted_rewards[idx_time]*(kroenecker-probs[idx_time][:,idx_action])*hidden_activities[idx_time]
-                updates += lr*update.squeeze()
-            weight_vector += updates
+            updates = compute_weight_update_equation2(weight_vector, actions, idx_action,
+                                                       discounted_rewards, probs, hidden_activities)
+            weight_vector += lr* updates
+
+
+def compute_weight_update_equation2(weight_vector, actions, idx_action, discounted_rewards,
+                                    probs, hidden_activities):
+
+    updates = torch.zeros(size=weight_vector.size())
+    for idx_time, action in enumerate(actions):
+        if idx_action == action:
+            kroenecker = 1
+        else:
+            kroenecker = 0
+        update = discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action]) * \
+                 hidden_activities[idx_time]
+        updates += update.squeeze()
+    return updates
 
 
 def update_weights_pseudo_online(network: Network, rewards: List[float],
                                  log_probs: List[torch.Tensor], el_traces):
-
 
     discounted_rewards = calculate_discounted_reward(rewards)
     # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
@@ -291,7 +299,7 @@ def update_weights_pseudo_online(network: Network, rewards: List[float],
             weight_vector += network.learning_rate * updates
 
 
-def calc_el_traces(GAMMA, probs, hidden_activities, actions, n_hidden, n_outputs, n_timesteps):
+def calc_el_traces(probs, hidden_activities, actions, n_hidden, n_outputs, n_timesteps, gamma=0.9):
     el_traces = torch.zeros([n_outputs, n_hidden, n_timesteps])
     # implementation of eq 3
     # for t=0
@@ -300,7 +308,7 @@ def calc_el_traces(GAMMA, probs, hidden_activities, actions, n_hidden, n_outputs
 
     for idx_time in range(1,n_timesteps):
         for idx_action in range(n_outputs):
-            el_traces[idx_action, : , idx_time] = GAMMA*el_traces[idx_action, :, idx_time-1] + \
+            el_traces[idx_action, : , idx_time] = gamma*el_traces[idx_action, :, idx_time-1] + \
                                                   _calc_el_elements(actions[idx_time], idx_action,
                                                                     probs[idx_time],
                                                                     hidden_activities[idx_time])
@@ -314,8 +322,8 @@ def _calc_el_elements(action, idx_action, probs, hidden_activities):
         return (0-probs[:,idx_action])*hidden_activities
 
 
-def update_el_traces(el_traces, GAMMA, prob, hidden_activities, action):
-    el_traces = GAMMA * el_traces
+def update_el_traces(el_traces, prob, hidden_activities, action, gamma=0.9):
+    el_traces = gamma * el_traces
     current_el_traces = torch.zeros(el_traces.shape)
     for idx_action in range(el_traces.size(0)):
         current_el_traces[idx_action,:] = _calc_el_elements(action, idx_action, prob,
