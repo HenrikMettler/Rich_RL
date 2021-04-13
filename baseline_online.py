@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import GAMMA, Network, update_el_traces, update_weights_online
+from network import Network, update_el_traces, update_weights_online
 from typing import Callable, List, Tuple, Union
 
 seed = 12
@@ -49,7 +49,7 @@ for episode in range(n_epsisodes):
         discounted_reward *= GAMMA
         discounted_reward += reward
 
-        el_traces = update_el_traces(el_traces, GAMMA, prob, hidden_activities, action)
+        el_traces = update_el_traces(el_traces, prob, hidden_activities, action)
 
         update_weights_online(network=online_net, reward=reward,  el_traces=el_traces,
                               log_prob=log_prob, discounted_reward = discounted_reward)

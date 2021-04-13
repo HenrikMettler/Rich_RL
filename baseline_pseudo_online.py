@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import GAMMA, Network, calc_el_traces, update_weights_pseudo_online
+from network import Network, calc_el_traces, update_weights_pseudo_online
 from typing import Callable, List, Tuple, Union
 
 seed = 123
@@ -54,9 +54,9 @@ for episode in range(n_epsisodes):
         hidden_activities_all.append(hidden_activities)
 
         if done:
-            el_traces = calc_el_traces(GAMMA,probs, hidden_activities_all, actions=actions,
+            el_traces = calc_el_traces(probs, hidden_activities_all, actions=actions,
                                        n_hidden=n_hidden, n_outputs=n_outputs,
-                                       n_timesteps=steps+1) #+1 offset
+                                       n_timesteps=steps + 1)  #+1 offset
             update_weights_pseudo_online(network=online_net, rewards=rewards, log_probs=log_probs,
                                          el_traces=el_traces)
 

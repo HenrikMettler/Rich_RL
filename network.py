@@ -280,7 +280,7 @@ def compute_weight_update_equation2(weight_vector, actions, idx_action, discount
 def update_weights_pseudo_online(network: Network, rewards: List[float],
                                  log_probs: List[torch.Tensor], el_traces):
 
-    discounted_rewards = calculate_discounted_reward(rewards)
+    discounted_rewards = calculate_discounted_rewards(rewards)
     # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
     discounted_rewards = normalize_discounted_rewards(discounted_rewards)
 

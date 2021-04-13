@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import GAMMA, Network, update_with_policy
+from network import Network, update_with_policy
 from typing import Callable, List, Tuple, Union
 
 use_autograd_for_output = True
@@ -85,4 +85,3 @@ plt.ylabel('Duration')
 plt.title(f"Using equation 2 for output layer update: { not use_autograd_for_output}")
 
 plt.show()
-a = 1
