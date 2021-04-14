@@ -3,11 +3,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import ipdb
 
 from torch.autograd import Variable
 from typing import Callable, List, Tuple, Union
 
-
+# Todo: "Vectorize update"
 class Network(nn.Module):
     """ Network class"""
 
@@ -33,7 +34,7 @@ class Network(nn.Module):
         super().__init__()
         self.num_actions = n_outputs
 
-        self.hidden_layer = nn.Linear(n_inputs, n_hidden) # Todo: train biases as well?
+        self.hidden_layer = nn.Linear(n_inputs, n_hidden)
         self.output_layer = nn.Linear(n_hidden, n_outputs)
 
         self.learning_rate = learning_rate
@@ -77,7 +78,7 @@ class Network(nn.Module):
         selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
         log_prob = torch.log(probs.squeeze(0)[selected_action])
         #prob = probs.squeeze(0)[selected_action]
-        return selected_action, log_prob, probs, hidden_activities
+        return selected_action, log_prob, probs, hidden_activities.squeeze()
 
 
 def update_weights(
@@ -238,43 +239,45 @@ def update_with_policy(network: Network, rewards: List[float], log_probs: List[t
     network.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
     policy_gradient.backward()
-    #import ipdb; ipdb.set_trace()
     network.optimizer.step()
 
     if not use_autograd_for_output:
-        update_output_weights_without_autograd(network, discounted_rewards, log_probs, probs,
+        update_output_weights_bias_without_autograd(network, discounted_rewards, log_probs, probs,
                                                actions, hidden_activities)
 
 
-def update_output_weights_without_autograd(network: Network, discounted_rewards: torch.Tensor,
+def update_output_weights_bias_without_autograd(network: Network, discounted_rewards: torch.Tensor,
                                            log_probs: List[torch.Tensor], probs, actions,
                                            hidden_activities):
-    """ manual update of output weights"""
+    """ manual update of output weights and biases"""
     with torch.no_grad(): # to prevent interference with backward
         lr = network.learning_rate
-        for idx_action, weight_vector in enumerate(network.output_layer.weight):
-            updates = compute_weight_update_equation2(weight_vector, actions, idx_action,
-                                                       discounted_rewards, probs, hidden_activities)
-            weight_vector -= lr* updates
+        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
+            weight_updates, bias_updates = compute_weight_bias_updates_equation2(actions, idx_action,
+                                                            discounted_rewards, probs, hidden_activities)
+            weight_vector -= lr* weight_updates
+            bias -= lr*bias_updates
 
 
-def compute_weight_update_equation2(weight_vector, actions, idx_action, discounted_rewards,
-                                    probs, hidden_activities):
+def compute_weight_bias_updates_equation2(actions, idx_action, discounted_rewards,
+                                          probs, hidden_activities):
 
     assert len(actions) == len(discounted_rewards)
     assert len(actions) == len(probs)
     assert len(actions) == len(hidden_activities)
 
-    updates = torch.zeros(size=weight_vector.size())
+    weight_updates = torch.zeros(len(hidden_activities[0]))
+    bias_updates = torch.zeros(1).squeeze()
     for idx_time, action in enumerate(actions):
         if idx_action == action:
             kroenecker = 1
         else:
             kroenecker = 0
-        update = discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action]) * \
-                 hidden_activities[idx_time]
-        updates += update.squeeze()
-    return -updates
+        #ipdb.set_trace()
+        weight_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action]) * \
+                 hidden_activities[idx_time])
+        bias_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action])).squeeze()
+    return -weight_updates, -bias_updates
 
 
 def update_weights_pseudo_online(network: Network, rewards: List[float],
