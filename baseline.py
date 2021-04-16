@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 from network import Network, update_with_policy
 from typing import Callable, List, Tuple, Union
 
-use_autograd_for_output = True
+# Todo: Add bias updates
+
+use_autograd_for_output = False
 
 seed = 123
 torch.manual_seed(seed=seed)
@@ -15,7 +17,7 @@ rng = np.random.default_rng(seed=seed)
 n_epsisodes: int = 5000
 n_steps_max: int = 10000
 
-env = gym.make('CarRacing-v0')
+env = gym.make('CartPole-v0')
 if isinstance(env.action_space, gym.spaces.Box):
     env_is_box = True
 else:

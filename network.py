@@ -8,6 +8,7 @@ import ipdb
 from torch.autograd import Variable
 from typing import Callable, List, Tuple, Union
 
+
 # Todo: "Vectorize update"
 class Network(nn.Module):
     """ Network class"""
@@ -77,7 +78,6 @@ class Network(nn.Module):
         hidden_activities, probs = self.forward(Variable(state))
         selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
         log_prob = torch.log(probs.squeeze(0)[selected_action])
-        #prob = probs.squeeze(0)[selected_action]
         return selected_action, log_prob, probs, hidden_activities.squeeze()
 
 
