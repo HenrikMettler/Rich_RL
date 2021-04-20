@@ -158,19 +158,21 @@ def compute_weight_bias_updates_equation4(rewards, el_traces):
     return -weight_updates, -bias_updates
 
 
-def update_el_traces(el_traces, prob, hidden_activities, action, gamma=0.9):
+def update_el_traces(el_traces, probs, hidden_activities, action, gamma=0.9):
     el_traces = gamma * el_traces
-    current_el_traces = torch.zeros(el_traces.shape)
-    for idx_action in range(el_traces.size(0)):
-        current_el_traces[idx_action,:] = _calc_el_elements(action, idx_action, prob,
-                                                            hidden_activities)
+
+    n_outputs = el_traces.size(0)
+
+    kroenecker = torch.Tensor([1 if idx_action == action else 0 for idx_action in range(n_outputs)])
+    pre_factor = kroenecker - probs
+    current_el_traces = torch.matmul(pre_factor.T, hidden_activities.unsqueeze(0))
 
     el_traces += current_el_traces
     return el_traces
 
 
 def update_weights_online(network, reward,  el_traces, log_prob, discounted_reward):
-    policy_gradient = log_prob * discounted_reward
+    policy_gradient = -log_prob * discounted_reward
 
     network.optimizer.zero_grad()
     policy_gradient.backward()
@@ -178,8 +180,13 @@ def update_weights_online(network, reward,  el_traces, log_prob, discounted_rewa
 
     # update output weights
     with torch.no_grad():
-        for idx_action, weight_vector in enumerate(network.output_layer.weight):
+        lr = network.learning_rate
+        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = reward*el_traces[idx_action,:]
-            weight_vector += network.learning_rate * updates
+            weight_update = updates[:-1]
+            bias_update = updates[-1]
+            weight_vector += lr * weight_update
+            bias += lr * bias_update
+
 
 

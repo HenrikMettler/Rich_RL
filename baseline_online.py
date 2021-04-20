@@ -3,10 +3,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import Network, update_el_traces, update_weights_online
+from network import Network
+from functions import update_el_traces, update_weights_online
 from typing import Callable, List, Tuple, Union
 
-seed = 12
+gamma = 0.9
+
+seed = 123
 torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
@@ -14,20 +17,11 @@ n_epsisodes: int = 5000
 n_steps_max: int = 10000
 
 env = gym.make('CartPole-v0')  # Pendulum-v0
-if isinstance(env.action_space, gym.spaces.Box):
-    env_is_box = True
-else:
-    env_is_box = False
 env.seed(seed=seed)
-env_cont_flag: bool = False
-
 
 n_inputs: int = env.observation_space.shape[0]
 n_hidden: int = 100
-if env_is_box:
-    n_outputs: int = env.action_space.shape[0]
-else:
-    n_outputs: int = env.action_space.n
+n_outputs: int = env.action_space.n
 learning_rate: float = 2e-4
 
 online_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
@@ -38,18 +32,21 @@ n_steps_per_episode: List[int] = []
 
 for episode in range(n_epsisodes):
     state = env.reset()
-    el_traces = torch.zeros([n_outputs, n_hidden])
+    el_traces = torch.zeros([n_outputs, n_hidden+1])
     discounted_reward = 0
 
     for steps in range(n_steps_max):
 
-        action, log_prob, prob, hidden_activities = online_net.get_action(state, rng)
+        action, probs, hidden_activities = online_net.get_action(state, rng)
+
+        hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
+        log_prob = torch.log(probs.squeeze(0)[action])
 
         new_state, reward, done, _ = env.step(action)
-        discounted_reward *= GAMMA
+        discounted_reward *= gamma
         discounted_reward += reward
 
-        el_traces = update_el_traces(el_traces, prob, hidden_activities, action)
+        el_traces = update_el_traces(el_traces, probs, hidden_activities, action)
 
         update_weights_online(network=online_net, reward=reward,  el_traces=el_traces,
                               log_prob=log_prob, discounted_reward = discounted_reward)
