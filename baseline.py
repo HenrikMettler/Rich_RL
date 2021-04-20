@@ -17,20 +17,11 @@ n_epsisodes: int = 5000
 n_steps_max: int = 10000
 
 env = gym.make('CartPole-v0')
-if isinstance(env.action_space, gym.spaces.Box):
-    env_is_box = True
-else:
-    env_is_box = False
 env.seed(seed=seed)
-env_cont_flag: bool = False
-
 
 n_inputs: int = env.observation_space.shape[0]
 n_hidden: int = 100
-if env_is_box:
-    n_outputs: int = env.action_space.shape[0]
-else:
-    n_outputs: int = env.action_space.n
+n_outputs: int = env.action_space.n
 learning_rate: float = 2e-4 #3e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
