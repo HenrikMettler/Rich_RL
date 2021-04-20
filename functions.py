@@ -83,6 +83,7 @@ def update_output_layer_with_equation2(network: Network, discounted_rewards: tor
     """ manual update of output weights and biases"""
     with torch.no_grad(): # to prevent interference with backward
         lr = network.learning_rate
+        # Todo: vectorize
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = compute_weight_bias_updates_equation2(actions, idx_action,
                                                             discounted_rewards, probs, hidden_activities)
@@ -99,12 +100,21 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     assert len(actions) == len(probs)
     assert len(actions) == len(hidden_activities)
 
-    updates = torch.zeros(len(hidden_activities[0]))
-    bias_updates = torch.zeros(1).squeeze()
-    for idx_time, action in enumerate(actions):
-        updates += (discounted_rewards[idx_time] * (int(idx_action == action) - probs[idx_time][:, idx_action]) * hidden_activities[idx_time])
-        #bias_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action])).squeeze()
-    return -updates, #-bias_updates
+    # Todo: improve names
+    kroenecker_vector = torch.Tensor([1 if action == idx_action else 0 for action in actions])
+    prob_vector = torch.Tensor([prob[:, idx_action] for prob in probs])
+    parenthesis = kroenecker_vector - prob_vector
+    left_term = discounted_rewards * parenthesis
+    hidden_activities_t = torch.stack(hidden_activities)
+    updates_vector = torch.matmul(left_term, hidden_activities_t)
+
+    #updates = torch.zeros(len(hidden_activities[0]))
+    ##bias_updates = torch.zeros(1).squeeze()
+    #for idx_time, action in enumerate(actions):
+    #    updates += (discounted_rewards[idx_time] * (int(idx_action == action) - probs[idx_time][:, idx_action]) * hidden_activities[idx_time])
+        ##bias_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action])).squeeze()
+
+    return -updates_vector, ##-bias_updates
 
 
 def update_output_layer_with_equation4(network: Network, rewards: List[float],
