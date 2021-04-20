@@ -4,7 +4,7 @@ import pytest
 import sys
 
 sys.path.insert(0, '../')
-from network import normalize_discounted_rewards, calculate_discounted_rewards
+from functions import normalize_discounted_rewards, calculate_discounted_rewards
 
 
 def test_calculate_discounted_rewards():
@@ -39,3 +39,5 @@ def test_normalize_discounted_rewards():
     assert normalize_discounted_rewards(discounted_rewards).numpy() == pytest.approx(np.array([-1/np.sqrt(2),1/np.sqrt(2)]))
 
 
+def test_calc_el_traces():
+    raise NotImplementedError
