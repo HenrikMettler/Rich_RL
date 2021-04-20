@@ -108,12 +108,6 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     hidden_activities_t = torch.stack(hidden_activities)
     updates_vector = torch.matmul(left_term, hidden_activities_t)
 
-    #updates = torch.zeros(len(hidden_activities[0]))
-    ##bias_updates = torch.zeros(1).squeeze()
-    #for idx_time, action in enumerate(actions):
-    #    updates += (discounted_rewards[idx_time] * (int(idx_action == action) - probs[idx_time][:, idx_action]) * hidden_activities[idx_time])
-        ##bias_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action])).squeeze()
-
     return -updates_vector, ##-bias_updates
 
 
@@ -137,25 +131,20 @@ def calc_el_traces(probs, hidden_activities, actions, gamma=0.9):
     n_outputs = probs[0].size(1)
     n_timesteps = len(probs)
 
+    # todo vectorize time dimension
     el_traces = torch.zeros([n_outputs, n_hidden, n_timesteps])
     # for t=0
-    for idx_action in range(n_outputs):
-        el_traces[idx_action, :, 0] = _calc_el_elements(actions[0], idx_action, probs[0], hidden_activities[0])
+    kroenecker = torch.Tensor([1 if idx_action == actions[0] else 0 for idx_action in range(n_outputs)])
+    pre_factor = kroenecker - probs[0]
+    el_traces[:,:,0] = torch.matmul(pre_factor.T, hidden_activities[0].unsqueeze(0))
 
     for idx_time in range(1,n_timesteps):
-        for idx_action in range(n_outputs):
-            el_traces[idx_action, :, idx_time] = gamma*el_traces[idx_action, :, idx_time-1] + \
-                                                  _calc_el_elements(actions[idx_time], idx_action,
-                                                                    probs[idx_time],
-                                                                    hidden_activities[idx_time])
+        kroenecker = torch.Tensor([1 if idx_action == actions[idx_time] else 0 for idx_action in range(n_outputs)])
+        pre_factor = kroenecker - probs[idx_time]
+        el_update = torch.matmul(pre_factor.T, hidden_activities[idx_time].unsqueeze(0))
+        el_traces[:,:,idx_time] = gamma * el_traces[:,:,idx_time-1] + el_update
+
     return el_traces
-
-
-def _calc_el_elements(action, idx_action, probs, hidden_activities):
-    if idx_action == action:
-        return (1-probs[:,idx_action])*hidden_activities
-    else:
-        return (0-probs[:,idx_action])*hidden_activities
 
 
 def compute_weight_bias_updates_equation4(rewards, el_traces):
