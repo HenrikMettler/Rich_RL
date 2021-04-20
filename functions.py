@@ -34,13 +34,15 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
 
 
 def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_activities,
-                           weight_update_mode: AnyStr):
+                   weight_update_mode: AnyStr = 'autograd',
+                   normalize_discounted_rewards_b = True):
     """adapted from: https://medium.com/@thechrisyoon/
     deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
 
     discounted_rewards = calculate_discounted_rewards(rewards)
     # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
-    discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+    if normalize_discounted_rewards_b:
+        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
 
     policy_gradient_list = calculate_policy_gradient_element_wise(
         log_probs=log_probs, discounted_rewards=discounted_rewards)
