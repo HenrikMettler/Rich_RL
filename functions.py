@@ -44,12 +44,15 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
     if normalize_discounted_rewards_b:
         discounted_rewards = normalize_discounted_rewards(discounted_rewards)
 
+    log_probs_t = torch.Tensor(log_probs)
     policy_gradient_list = calculate_policy_gradient_element_wise(
         log_probs=log_probs, discounted_rewards=discounted_rewards)
 
     network.optimizer.zero_grad()
-    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    policy_gradient.backward()
+    policy_gradient_old: torch.Tensor = torch.stack(policy_gradient_list).sum()
+    # Todo: this doesn't work because of grad_fn -> fix it
+    policy_gradient: torch.Tensor = (-log_probs_t*discounted_rewards).sum()
+    policy_gradient_old.backward()
     network.optimizer.step()
 
     if weight_update_mode == 'equation2':
@@ -60,6 +63,7 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
             "hidden_activities": hidden_activities
         }
         update_output_layer_with_equation2(network, **eq2_params)
+
     elif weight_update_mode == 'equation4':
         el_params = {
             "probs": probs,
@@ -67,8 +71,9 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
             "actions": actions,
         }
         update_output_layer_with_equation4(network, rewards, el_params)
+
     elif weight_update_mode == 'autograd':
-        pass # update done above
+        pass  # update done above
     else:
         raise NotImplementedError
 
@@ -97,11 +102,7 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     updates = torch.zeros(len(hidden_activities[0]))
     bias_updates = torch.zeros(1).squeeze()
     for idx_time, action in enumerate(actions):
-        if idx_action == action:
-            kroenecker = 1
-        else:
-            kroenecker = 0
-        updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action]) * hidden_activities[idx_time])
+        updates += (discounted_rewards[idx_time] * (int(idx_action == action) - probs[idx_time][:, idx_action]) * hidden_activities[idx_time])
         #bias_updates += (discounted_rewards[idx_time] * (kroenecker - probs[idx_time][:, idx_action])).squeeze()
     return -updates, #-bias_updates
 
