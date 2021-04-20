@@ -3,12 +3,11 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import Network, update_with_policy
+from network import Network
+from functions import update_weights
 from typing import Callable, List, Tuple, Union
 
-# Todo: Add bias updates
-
-use_autograd_for_output = False
+weight_update_mode = 'equation4'  # options: 'autograd', 'equation2', 'equation4' # todo: rename modes; add online
 
 seed = 123
 torch.manual_seed(seed=seed)
@@ -35,7 +34,7 @@ else:
 learning_rate: float = 2e-4 #3e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
-                     learning_rate=learning_rate, use_autograd_for_output=use_autograd_for_output)
+                     learning_rate=learning_rate, weight_update_mode=weight_update_mode)
 
 n_steps_per_episode: List[int] = []
 
@@ -48,12 +47,12 @@ for episode in range(n_epsisodes):
     hidden_activities_all = []
 
     for steps in range(n_steps_max):
-        #  env.render()
-        if env_cont_flag:
-            raise NotImplementedError  # Todo: what is the continuous equivalent?
-            # -> see Lillicrap et al. Cont. Control paper
-        else:
-            action, log_prob, prob, hidden_activities = policy_net.get_action(state, rng)
+
+        action, prob, hidden_activities = policy_net.get_action(state, rng)
+
+        # Todo: Discuss with Jay, if catting 1 here is a good solution
+        hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
+        log_prob = torch.log(prob.squeeze(0)[action])
 
         new_state, reward, done, _ = env.step(action)
         log_probs.append(log_prob)
@@ -63,9 +62,16 @@ for episode in range(n_epsisodes):
         hidden_activities_all.append(hidden_activities)
 
         if done:
-            update_with_policy(network=policy_net, rewards=rewards, log_probs=log_probs,
-                               use_autograd_for_output=use_autograd_for_output, actions=actions,
-                               probs=probs, hidden_activities=hidden_activities_all)
+            update_params={
+                "rewards": rewards,
+                "probs": probs,
+                "log_probs": log_probs,
+                "actions": actions,
+                "hidden_activities": hidden_activities_all,
+            }
+            update_weights(network=policy_net, **update_params,
+                           weight_update_mode=weight_update_mode)
+
             n_steps_per_episode.append(steps)
 
             if episode % 100 == 0:
@@ -74,6 +80,7 @@ for episode in range(n_epsisodes):
             break
         state = new_state
 
+# plotting episode duration
 n_steps_smoothed = []
 smoothing_coeff = 0.9
 n_steps_smoothed.append(n_steps_per_episode[0])
@@ -84,6 +91,6 @@ plt.plot(n_steps_per_episode, label='Duration')
 plt.plot(n_steps_smoothed, label='Smoothed Duration')
 plt.xlabel('Episode')
 plt.ylabel('Duration')
-plt.title(f"Using equation 2 for output layer update: { not use_autograd_for_output}")
+plt.title(f"Output layer update mode: {weight_update_mode}")
 
 plt.show()
