@@ -189,4 +189,25 @@ def update_weights_online(network, reward,  el_traces, log_prob, discounted_rewa
             bias += lr * bias_update
 
 
+def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward):
+    policy_gradient = -log_prob * discounted_reward
+
+    network.optimizer.zero_grad()
+    policy_gradient.backward()
+    network.optimizer.step()
+
+    # update_output weights
+    with torch.no_grad():
+        lr = network.learning_rate
+        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
+            # Todo: implement correct update with t
+            updates = None # rule(reward * el_traces[idx_action, :])??
+            weight_update = updates[:-1]
+            bias_update = updates[-1]
+            weight_vector += lr * weight_update
+            bias += lr * bias_update
+
+
+def update_weights_with_rule():
+    raise NotImplementedError
 

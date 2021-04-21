@@ -14,7 +14,7 @@ torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
 n_epsisodes: int = 5000
-n_steps_max: int = 10000
+n_steps_max: int = 1000
 
 env = gym.make('CartPole-v0')
 env.seed(seed=seed)

@@ -20,3 +20,7 @@ def states():
 @fixture
 def rewards():
     return [0.75, 0.85]
+
+@fixture
+def gamma():
+    return 0.9
