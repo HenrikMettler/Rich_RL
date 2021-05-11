@@ -5,74 +5,79 @@ import sympy
 import functools
 import warnings
 import time
-import tracemalloc
+import cProfile
 
 import cgp
 
-from torch.autograd import Variable
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set
+from network import Network
+from functions import update_el_traces, update_weights_online_with_rule
+from variables import onlinelr_dna_20internal
+from operators import Const05Node, Const2Node
 
-from network import Network, update_weights
+gamma = 0.9
+cumulative_reward_threshold = 250000  # empirical value that policy gradient receives after ~ 3000 episodes
+
+use_online_init = True
+
+
+def set_initial_dna(ind):
+    genome = cgp.Genome(**genome_params)
+    genome.dna = onlinelr_dna_20internal
+    return cgp.IndividualSingleGenome(genome)
 
 
 def inner_objective(
     t: torch.nn.Module,
     network: Network,
     env: gym.Env,
-    n_runs_per_individual: int,
     n_steps_per_run: int,
     seed: int,
     rng: np.random.Generator,
 ) -> float:
 
     env.seed(seed)
-
-    cum_reward_all_episodes: List = []
-    for _ in range(n_runs_per_individual):
+    cum_reward = 0
+    episode_counter = 0
+    while cum_reward < cumulative_reward_threshold:
         state = env.reset()
-        cum_reward_this_episode: float = 0
+        el_traces = torch.zeros([network.output_layer.out_features, network.output_layer.in_features + 1])
+        discounted_reward = 0
 
         for _ in range(n_steps_per_run):
-            # compute forward pass and take a step
-            state = torch.from_numpy(state).float().unsqueeze(0)
-            hidden_activities, output_activities = network.forward(Variable(state))
-            action = rng.choice(network.num_actions, p=np.squeeze(output_activities.detach().numpy()))
-            if np.isnan(action):  # return early if actions diverge
-                return -np.inf
+            action, probs, hidden_activities = network.get_action(state, rng)
 
-            observation, reward, done, _ = env.step(action)
+            hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
+            log_prob = torch.log(probs.squeeze(0)[action])
 
-            # update the weights according to t
-            update_weights(
-                network=network,
-                t=t,
-                observation=observation,
-                hidden_activities=hidden_activities,
-                output_activities=output_activities,
-                reward=reward,
-            )
-            cum_reward_this_episode += reward
+            new_state, reward, done, _ = env.step(action)
+            discounted_reward *= gamma
+            discounted_reward += reward
+            cum_reward += reward
+
+            el_traces = update_el_traces(el_traces, probs, hidden_activities, action)
+
+            update_weights_online_with_rule(rule=t, network=network, reward=reward, el_traces=el_traces,
+                                  log_prob=log_prob, discounted_reward=discounted_reward, done= done)
 
             if done:
-                cum_reward_all_episodes.append(cum_reward_this_episode)
-                cum_reward_this_episode = 0
-                observation = env.reset()
+                episode_counter += 1
+                break
+            state = new_state
 
     env.close()
-    cum_reward: float = np.mean(cum_reward_all_episodes)
 
-    return cum_reward
+    return float(episode_counter)
 
 
 def objective(
     individual: cgp.IndividualSingleGenome,
-    n_runs_per_individual: int,
     n_steps_per_run: int,
     learning_rate: float,
     seed: int,
     rng: np.random.Generator,
 ):
-    if individual.fitness is not None:
+
+    if not individual.fitness_is_None():
         return individual
 
     # environment initialization
@@ -82,25 +87,14 @@ def objective(
     torch.manual_seed(seed=seed)
     n_inputs = env.observation_space.shape[0]
     n_hidden = 100
-    if isinstance(env.action_space, gym.spaces.Box):
-        n_outputs = env.action_space.shape[0]
-    else:
-        n_outputs: int = env.action_space.n
+    n_outputs: int = env.action_space.n
 
-    network = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
-                      learning_rate=learning_rate)
+    network = Network(n_inputs, n_hidden, n_outputs, learning_rate,
+                 weight_update_mode='evolved_rule')
 
     t = individual.to_torch()
     try:
-        with warnings.catch_warnings():  # ignore warnings due to zero division
-            warnings.filterwarnings(
-                "ignore", message="divide by zero encountered in double_scalars"
-            )
-            warnings.filterwarnings(
-                "ignore", message="invalid value encountered in double_scalars"
-            )
-            individual.fitness = inner_objective(t=t, network=network, env=env,
-                                                 n_runs_per_individual=n_runs_per_individual,
+        individual.fitness = -inner_objective(t=t, network=network, env=env,
                                                  n_steps_per_run=n_steps_per_run, seed=seed,
                                                  rng=rng)
     except ZeroDivisionError:
@@ -109,26 +103,29 @@ def objective(
     return individual
 
 
-seed = 1000
-n_runs_per_individual = 3
-n_steps_per_run = 1000
-learning_rate = 3e-4
+seed = 123
+n_steps_per_run = 200
+learning_rate = 2e-4
 rng = np.random.default_rng(seed=seed)
 
 # population and evolutionary algorithm initialization
 population_params = {"n_parents": 1, "seed": seed}
 genome_params = {
-    "n_inputs": 4,  # pre, post, weight, reward
+    "n_inputs": 3,  # reward, el_traces, done (episode termination)
     "n_outputs": 1,
-    "n_columns": 25,
+    "n_columns": 20,
     "n_rows": 1,
     "levels_back": None,
-    "primitives": (cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
+    "primitives": (cgp.Mul, cgp.Add, cgp.Sub, cgp.ConstantFloat, Const05Node, Const2Node) #(cgp.Add, cgp.Sub, cgp.Mul, cgp.ConstantFloat),
 }
-ea_params = {"n_offsprings": 4, "mutation_rate": 0.03, "n_processes": 1}
-evolve_params = {"max_generations": 1000, "min_fitness": 0}
+ea_params = {"n_offsprings": 4, "mutation_rate": 0.03, "reorder_genome": True, "n_processes": 1}
+evolve_params = {"max_generations": 100, "termination_fitness": -2000}  # Todo: set reasonable termination fitness
 
-pop = cgp.Population(**population_params, genome_params=genome_params)
+if use_online_init:
+    pop = cgp.Population(**population_params, genome_params=genome_params, individual_init=set_initial_dna)
+else:
+    pop = cgp.Population(**population_params, genome_params=genome_params)
+
 ea = cgp.ea.MuPlusLambda(**ea_params)
 
 # initialize a history
@@ -144,7 +141,6 @@ def recording_callback(pop):
 
 obj = functools.partial(
     objective,
-    n_runs_per_individual=n_runs_per_individual,
     n_steps_per_run=n_steps_per_run,
     learning_rate=learning_rate,
     seed=seed,
@@ -152,9 +148,7 @@ obj = functools.partial(
 )
 
 start = time.time()
-cgp.evolve(
-    pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback
-)
+cgp.evolve(pop, obj, ea, **evolve_params, print_progress=True, callback=recording_callback)
 end = time.time()
 print(f"Time elapsed:", end - start)
 
@@ -163,6 +157,4 @@ best_expr = pop.champion.to_sympy()
 # best_expr = best_expr.replace("x_0", "pre").replace("x_1", "post").replace("x_2, "weight")
 # .replace("x_4", "reward")
 print(
-    f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})  '
-    f"for {n_runs_per_individual} timesteps per evaluation"
-)
+    f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})')
