@@ -182,14 +182,18 @@ def update_weights_online(network, reward,  el_traces, log_prob, discounted_rewa
     with torch.no_grad():
         lr = network.learning_rate
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-            updates = reward*el_traces[idx_action,:]
+            updates = compute_weight_bias_update_online(reward, el_traces[idx_action,:])
             weight_update = updates[:-1]
             bias_update = updates[-1]
-            weight_vector += lr * weight_update
-            bias += lr * bias_update
+            weight_vector -= lr * weight_update
+            bias -= lr * bias_update
 
 
-def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward):
+def compute_weight_bias_update_online(reward, el_traces_per_output):
+    return -reward*el_traces_per_output
+
+
+def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward, done):
     policy_gradient = -log_prob * discounted_reward
 
     network.optimizer.zero_grad()
@@ -199,9 +203,12 @@ def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob,
     # update_output weights
     with torch.no_grad():
         lr = network.learning_rate
+        rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
+        done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
+
+        # Todo: possible to vectorize this update?
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-            # Todo: implement correct update with t
-            updates = None # rule(reward * el_traces[idx_action, :])??
+            updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:], done_torch_expanded],1)).squeeze()
             weight_update = updates[:-1]
             bias_update = updates[-1]
             weight_vector += lr * weight_update
