@@ -75,6 +75,12 @@ class Network(nn.Module):
     def get_action(self, state: np.ndarray, rng: np.random.Generator) -> Tuple[np.ndarray,
                                                                                torch.Tensor, torch.Tensor]:
         state = torch.from_numpy(state).float().unsqueeze(0)
-        hidden_activities, probs = self.forward(Variable(state))
-        selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
+        hidden_activities, probs = self.forward(Variable(state)) # todo: check whether Variable(state) is necessary (state.requires_grad)
+        # Todo: use torch generator instead of numpy rng
+        # Todo: check why this happens and how to avoid it
+        try:
+            selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
+        except ValueError:
+            #print('probs are nan')
+            selected_action = rng.choice(self.num_actions)
         return selected_action, probs, hidden_activities.squeeze()
