@@ -7,7 +7,7 @@ from network import Network
 from functions import update_weights
 from typing import Callable, List, Tuple, Union
 
-weight_update_mode = 'equation4'  # options: 'autograd', 'equation2', 'equation4' # todo: rename modes; add online
+weight_update_mode = 'equation4'  # options: 'autograd', 'equation2', 'equation4' # todo: rename modes
 
 seed = 123
 torch.manual_seed(seed=seed)
@@ -22,12 +22,13 @@ env.seed(seed=seed)
 n_inputs: int = env.observation_space.shape[0]
 n_hidden: int = 100
 n_outputs: int = env.action_space.n
-learning_rate: float = 2e-4 #3e-4
+learning_rate: float = 1e-4 #3e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                      learning_rate=learning_rate, weight_update_mode=weight_update_mode)
 
 n_steps_per_episode: List[int] = []
+cum_reward = 0
 
 for episode in range(n_epsisodes):
     state = env.reset()
@@ -41,7 +42,7 @@ for episode in range(n_epsisodes):
 
         action, prob, hidden_activities = policy_net.get_action(state, rng)
 
-        # Todo: Discuss with Jay, if catting 1 here is a good solution
+        # Todo: Shift lower (deeper in code) and rename variable (hidden and bias)
         hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
         log_prob = torch.log(prob.squeeze(0)[action])
 
@@ -51,6 +52,7 @@ for episode in range(n_epsisodes):
         actions.append(action)
         rewards.append(reward)
         hidden_activities_all.append(hidden_activities)
+        cum_reward += reward
 
         if done:
             update_params={
@@ -67,7 +69,7 @@ for episode in range(n_epsisodes):
 
             if episode % 100 == 0:
                 print(f"episode {episode}, n_steps: {steps}\n")
-
+                print(f"Cumulative Reward: {cum_reward}")
             break
         state = new_state
 

@@ -9,12 +9,13 @@ from typing import Callable, List, Tuple, Union
 
 gamma = 0.9
 
+# Todo: Write params in json file
 seed = 123
 torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
-n_epsisodes: int = 5000
-n_steps_max: int = 10000
+n_epsisodes: int = 10000
+n_steps_max: int = 200
 
 env = gym.make('CartPole-v0')  # Pendulum-v0
 env.seed(seed=seed)
@@ -43,6 +44,11 @@ for episode in range(n_epsisodes):
         log_prob = torch.log(probs.squeeze(0)[action])
 
         new_state, reward, done, _ = env.step(action)
+        # Reward modulation
+        if not done:
+            reward = 0.0 # reward  = 0
+        else:
+            reward = -1.0
         discounted_reward *= gamma
         discounted_reward += reward
 
