@@ -2,7 +2,9 @@ import torch
 import numpy as np
 
 from network import Network
-from typing import AnyStr, Callable, Dict, List, Tuple, Union
+from typing import AnyStr, List
+
+from cgp.genome import ID_INPUT_NODE, ID_NON_CODING_GENE, ID_OUTPUT_NODE
 
 
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
@@ -49,10 +51,8 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
         log_probs=log_probs, discounted_rewards=discounted_rewards)
 
     network.optimizer.zero_grad()
-    policy_gradient_old: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    # Todo: this doesn't work because of grad_fn -> fix it
-    policy_gradient: torch.Tensor = (-log_probs_t*discounted_rewards).sum()
-    policy_gradient_old.backward()
+    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+    policy_gradient.backward()
     network.optimizer.step()
 
     if weight_update_mode == 'equation2':
@@ -83,7 +83,6 @@ def update_output_layer_with_equation2(network: Network, discounted_rewards: tor
     """ manual update of output weights and biases"""
     with torch.no_grad(): # to prevent interference with backward
         lr = network.learning_rate
-        # Todo: vectorize
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = compute_weight_bias_updates_equation2(actions, idx_action,
                                                             discounted_rewards, probs, hidden_activities)
@@ -100,7 +99,6 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     assert len(actions) == len(probs)
     assert len(actions) == len(hidden_activities)
 
-    # Todo: improve names
     kroenecker_vector = torch.Tensor([1 if action == idx_action else 0 for action in actions])
     prob_vector = torch.Tensor([prob[:, idx_action] for prob in probs])
     parenthesis = kroenecker_vector - prob_vector
@@ -131,7 +129,6 @@ def calc_el_traces(probs, hidden_activities, actions, gamma=0.9):
     n_outputs = probs[0].size(1)
     n_timesteps = len(probs)
 
-    # todo vectorize time dimension
     el_traces = torch.zeros([n_outputs, n_hidden, n_timesteps])
     # for t=0
     kroenecker = torch.Tensor([1 if idx_action == actions[0] else 0 for idx_action in range(n_outputs)])
@@ -193,7 +190,8 @@ def compute_weight_bias_update_online(reward, el_traces_per_output):
     return -reward*el_traces_per_output
 
 
-def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward, done):
+def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward,
+                                    done, expected_cum_reward_per_episode):
     policy_gradient = -log_prob * discounted_reward
 
     network.optimizer.zero_grad()
@@ -205,10 +203,13 @@ def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob,
         lr = network.learning_rate
         rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
         done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
+        expected_cum_reward_per_episode_torch_expanded = expected_cum_reward_per_episode * torch.ones_like(
+            rewards_torch_expanded)
 
-        # Todo: possible to vectorize this update?
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-            updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:], done_torch_expanded],1)).squeeze()
+        # todo: check if possible to set updates values into weight_vector to save them for update at next time step
+            updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:],
+                                        done_torch_expanded, expected_cum_reward_per_episode_torch_expanded],1)).squeeze()
             weight_update = updates[:-1]
             bias_update = updates[-1]
             weight_vector += lr * weight_update
@@ -218,3 +219,32 @@ def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob,
 def update_weights_with_rule():
     raise NotImplementedError
 
+
+def initialize_genome_with_rxet_prior(n_inputs, n_hidden, n_operators, max_arity, rng):
+    max_arity += 1 # account for operator gene not counted in arity
+    dna = []
+    # add inputs
+    for idx in range(n_inputs*max_arity):
+        if idx%max_arity == 0:
+            dna.append(ID_INPUT_NODE)
+        else:
+            dna.append(ID_NON_CODING_GENE)
+
+    # add r*et prior
+    dna.append(0)  # Assuming Mul is the first operator
+    dna.append(0)  # Assuming r is the first input
+    dna.append(1)  # Assuming et is the second input
+
+    # add random n_hidden-1 genes
+    for idx in range(max_arity,n_hidden*max_arity):  # start at max_arity because 1st gene is set
+        if idx%max_arity == 0:
+            dna.append(rng.integers(low=0,high=n_operators))  # (address 4)
+        else:
+            dna.append(rng.integers(low=0,high=int(idx/max_arity)+n_inputs))
+
+    # add output
+    dna.append(ID_OUTPUT_NODE)
+    dna.append(n_inputs) # r*et has node-index of n_inputs
+    dna.append(ID_NON_CODING_GENE)
+
+    return dna
