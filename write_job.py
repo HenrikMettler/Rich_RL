@@ -25,6 +25,7 @@ if __name__ == '__main__':
         'n_nodes': 1,
         'mail-user': 'henrik.mettler@unibe.ch',
         'account': 'ich029m',
+        'constraint': 'gpu',
         'partition': 'debug',
         'sim_script': 'main.py',
         'dependencies': ['functions.py', 'operators.py', 'network.py'],
