@@ -24,7 +24,7 @@ if __name__ == '__main__':
         'cpus-per-task': 4,
         'n_nodes': 1,
         'mail-user': 'henrik.mettler@unibe.ch',
-        'account': 'bp000398',
+        'account': 'ich029m',
         'partition': 'debug',
         'sim_script': 'main.py',
         'dependencies': ['functions.py', 'operators.py', 'network.py'],
