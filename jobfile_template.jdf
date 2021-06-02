@@ -4,7 +4,7 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user={mail-user}
 #SBATCH --time {wall_clock_limit}
-#SBATCH --nodes {n_nodes}
+#SBATCH --nodes={n_nodes}
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=36
 #SBATCH --cpus-per-task=1
@@ -14,4 +14,4 @@
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-srun ./main.py
+srun main.py
