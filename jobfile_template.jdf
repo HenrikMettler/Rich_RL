@@ -1,6 +1,6 @@
 #!/bin/bash -l
-#SBATCH --job-name= "{jobname}"
-#SBATCH --account= {account}
+#SBATCH --job-name="{jobname}"
+#SBATCH --account="{account}"
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user={mail-user}
 #SBATCH --time {wall_clock_limit}
