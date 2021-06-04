@@ -5,7 +5,6 @@ import sympy
 import functools
 import time
 import pickle
-import os
 
 from typing import Optional, AnyStr
 
@@ -229,7 +228,6 @@ if __name__ == "__main__":
         f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})')
 
     # store history
-    filename = os.path.join(params['outputdir'], 'data' + 'history' +'.pickle')
     filename = 'history.pickle'
     file = open(filename, 'wb')
     pickle.dump(history, file)
