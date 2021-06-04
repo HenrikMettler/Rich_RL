@@ -228,3 +228,8 @@ if __name__ == "__main__":
     print(
         f'Learning rule with highest fitness: "{best_expr}" (fitness: {max_fitness})')
 
+    # store history
+    filename = 'history.pickle'
+    file = open(filename, 'wb')
+    pickle.dump(history, file)
+
