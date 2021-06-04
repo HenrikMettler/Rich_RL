@@ -11,7 +11,8 @@ from typing import Optional, AnyStr
 import cgp
 
 from network import Network
-from functions import update_el_traces, update_weights_online_with_rule, initialize_genome_with_rxet_prior
+from functions import update_el_traces, update_weights_online_with_rule, \
+    initialize_genome_with_rxet_prior, compute_key_for_cache
 from operators import Const05Node, Const2Node
 
 if __name__ == "__main__":
@@ -66,8 +67,11 @@ if __name__ == "__main__":
         return cgp.IndividualSingleGenome(genome)
 
 
+    @cgp.utils.disk_cache(
+        "cached_ind.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
+    )
     def inner_objective(
-        t: torch.nn.Module,
+        ind: cgp.IndividualSingleGenome,
         network: Network,
         env: gym.Env,
         seed: int,
@@ -81,6 +85,7 @@ if __name__ == "__main__":
 
     ) -> float:
 
+        t = ind.to_torch()
         env.seed(seed)
         cum_reward = 0
         episode_counter = 0
@@ -144,9 +149,8 @@ if __name__ == "__main__":
         network = Network(n_inputs=env.observation_space.shape[0], n_hidden=100,
                           n_outputs=env.action_space.n, learning_rate=2e-4, weight_update_mode='evolved_rule')
 
-        t = individual.to_torch()
         try:
-            individual.fitness = inner_objective(t=t, network=network, env=env,
+            individual.fitness = inner_objective(individual, network=network, env=env,
                                                   n_episodes=n_episodes, gamma=gamma,
                                                   seed=seed, rng=rng, mode='reward_max')
         except ZeroDivisionError:
@@ -170,9 +174,8 @@ if __name__ == "__main__":
         # environment initialization
         env = gym.make('CartPole-v0')
 
-        t = individual.to_torch()
         try:
-            individual.fitness = inner_objective(t=t, network=individual.network, env=env,
+            individual.fitness = inner_objective(individual, network=individual.network, env=env,
                                                  cum_reward_threshold=cum_reward_threshold,
                                                  gamma=gamma, seed=seed, rng=rng, mode='episode_min')
         except ZeroDivisionError:
