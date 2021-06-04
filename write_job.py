@@ -19,14 +19,14 @@ if __name__ == '__main__':
         'submit_command': 'sbatch',
         'jobfile_template': 'jobfile_template.jdf',
         'jobname': 'rrl',
-        'wall_clock_limit': '24:00:00',
+        'wall_clock_limit': '00:30:00',
         'ntasks': 6,
         'cpus-per-task': 4,
         'n_nodes': 1,
         'mail-user': 'henrik.mettler@unibe.ch',
         'account': 'ich029m',
         'constraint': 'mc',
-        'partition': 'normal',
+        'partition': 'debug',
         'sim_script': 'main.py',
         'dependencies': ['functions.py', 'operators.py', 'network.py'],
 
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
         'ea_params' : {"n_offsprings": 4, "mutation_rate": 0.03, "reorder_genome": True, "n_processes": 1,
                  "hurdle_percentile": [0.5, 0.0], },
-        'evolve_params' : {"max_generations": 100},  # Todo: set reasonable termination fitness
+        'evolve_params' : {"max_generations": 2},  # Todo: set reasonable termination fitness
 
         'genome_params' : {
             "n_inputs": 4,  # reward, el_traces, done (episode termination), expected_cum_reward_episode
