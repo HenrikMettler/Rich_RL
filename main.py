@@ -12,7 +12,7 @@ import cgp
 
 from network import Network
 from functions import update_el_traces, update_weights_online_with_rule, \
-    initialize_genome_with_rxet_prior, compute_key_for_cache
+    initialize_genome_with_rxet_prior
 from operators import Const05Node, Const2Node
 
 if __name__ == "__main__":
