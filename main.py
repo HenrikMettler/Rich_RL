@@ -17,7 +17,7 @@ from operators import Const05Node, Const2Node
 
 if __name__ == "__main__":
 
-    using_pickled_params = True  # option for pre written parameters written in write_job
+    using_pickled_params = False  # option for pre written parameters written in write_job
 
     if using_pickled_params:
         with open('params.pickle', 'rb') as f:
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         population_params = {"n_parents": 1, "seed": seed}
         ea_params = {"n_offsprings": 4, "mutation_rate": 0.03, "reorder_genome": True, "n_processes": 1,
                      "hurdle_percentile": [0.5, 0.0], }
-        evolve_params = {"max_time": 20}
+        evolve_params = {"max_time": 30}
 
         genome_params = {
             "n_inputs": 4,  # reward, el_traces, done (episode termination), expected_cum_reward_episode
@@ -66,10 +66,9 @@ if __name__ == "__main__":
 
         return cgp.IndividualSingleGenome(genome)
 
-
-    @cgp.utils.disk_cache(
-        "cache.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
-    )
+    #@cgp.utils.disk_cache(
+    #    "cache.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
+    #)
     def inner_objective(
         ind: cgp.IndividualSingleGenome,
         network: Network,
@@ -86,7 +85,6 @@ if __name__ == "__main__":
     ) -> float:
 
         t = ind.to_torch()
-        env.seed(seed)
         cum_reward = 0
         episode_counter = 0
         expected_cum_reward_per_episode = 0
@@ -129,7 +127,6 @@ if __name__ == "__main__":
         else:
             raise AssertionError('Mode not available')
 
-    # Todo: - cache
     def objective_one(
         individual: cgp.IndividualSingleGenome,
         n_episodes: int,
@@ -143,6 +140,8 @@ if __name__ == "__main__":
 
         # environment initialization
         env = gym.make('CartPole-v0')
+        env.seed(seed=seed)
+        env.action_space.seed(seed)
 
         # network initialization
         torch.manual_seed(seed=seed)
