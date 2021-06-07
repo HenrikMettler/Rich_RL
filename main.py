@@ -43,7 +43,7 @@ if __name__ == "__main__":
         population_params = {"n_parents": 1, "seed": seed}
         ea_params = {"n_offsprings": 4, "mutation_rate": 0.03, "reorder_genome": True, "n_processes": 1,
                      "hurdle_percentile": [0.5, 0.0], }
-        evolve_params = {"max_generations": 2}
+        evolve_params = {"max_time": 20}
 
         genome_params = {
             "n_inputs": 4,  # reward, el_traces, done (episode termination), expected_cum_reward_episode
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
 
     @cgp.utils.disk_cache(
-        "cached_ind.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
+        "cache.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
     )
     def inner_objective(
         ind: cgp.IndividualSingleGenome,

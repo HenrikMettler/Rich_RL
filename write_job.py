@@ -35,14 +35,15 @@ if __name__ == '__main__':
         'gamma' : 0.9,
         'use_online_init' : True,
         'n_episodes' : 1000,
-        'cum_reward_threshold' : 250000,  # empirical value that policy gradient receives after ~ 3000 episodes
+        'cum_reward_threshold' : 250000,  # empirical value that policy gradient receives after
+                                            # ~ 3000 episodes
         'n_episodes_reward_expectation' : 100,
 
         'population_params' : {"n_parents": 1, "seed": 12345},
 
         'ea_params' : {"n_offsprings": 4, "mutation_rate": 0.03, "reorder_genome": True, "n_processes": 1,
                  "hurdle_percentile": [0.5, 0.0], },
-        'evolve_params' : {"max_generations": 1000},  # Todo: set reasonable termination fitness
+        'evolve_params' : {"max_time": 84600}, # 84600s ≃  23h 30 min
 
         'genome_params' : {
             "n_inputs": 4,  # reward, el_traces, done (episode termination), expected_cum_reward_episode
