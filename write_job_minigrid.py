@@ -22,7 +22,7 @@ if __name__ == '__main__':
         'submit_command': 'sbatch',
         'jobfile_template': 'jobfile_template.jdf',
         'jobname': 'rrl',
-        'wall_clock_limit': '00:30:00',
+        'wall_clock_limit': '00:10:00',
         'ntasks': 6,
         'cpus-per-task': 4,
         'n_nodes': 1,
@@ -35,8 +35,8 @@ if __name__ == '__main__':
 
         # experiment configuration
         'seed' :  123456789,
-        'n_hidden' : sys.argv[1],
-        'learning_rate' : sys.argv[2],
+        'n_hidden' : int(sys.argv[1]),
+        'learning_rate' : float(sys.argv[2]),
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
