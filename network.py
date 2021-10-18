@@ -130,9 +130,9 @@ class VanillaRNN(nn.Module):
 
         Returns
         -------
-        hidden_activities: torch.Tensor
+        hidden: torch.Tensor
             Hidden layer activities
-        output_activities: torch.Tensor
+        output: torch.Tensor
             Output layer activities
         """
 
