@@ -3,13 +3,20 @@ import json
 import numpy as np
 import os
 import sys
+import argparse
 
 import cgp
+
+from minigrid_baseline import n_episodes
 
 sys.path.insert(0, '../../includes/')
 import write_job_utils as utils
 
-from operators import Const05Node, Const2Node
+parser = argparse.ArgumentParser
+parser.add_argument("--n_episodes", required=True)
+parser.add_argument("--n_hidden", required=True)
+parser.add_argument("--learning_rate", required=True)
+args = parser.parse_args()
 
 if __name__ == '__main__':
 
@@ -32,10 +39,9 @@ if __name__ == '__main__':
 
         # experiment configuration
         'seed' :  123456789,
-        'n_episodes' : int(sys.argv[0]),
-        'n_hidden_units' : int(sys.argv[1]),
-        'learning_rate' : float(sys.argv[2])
-
+        'n_episodes' : args.n_episodes,
+        'n_hidden_units' : args.n_hidden,
+        'learning_rate' : args.learning_rate,
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
