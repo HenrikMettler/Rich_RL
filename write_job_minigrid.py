@@ -8,11 +8,11 @@ import argparse
 sys.path.insert(0, '../../includes/')
 import write_job_utils as utils
 
-parser = argparse.ArgumentParser
+"""parser = argparse.ArgumentParser
 parser.add_argument("--n_episodes", required=True)
 parser.add_argument("--n_hidden", required=True)
 parser.add_argument("--learning_rate", required=True)
-args = parser.parse_args()
+args = parser.parse_args()"""
 
 if __name__ == '__main__':
 
@@ -35,9 +35,9 @@ if __name__ == '__main__':
 
         # experiment configuration
         'seed' :  123456789,
-        'n_episodes' : args.n_episodes,
-        'n_hidden_units' : args.n_hidden,
-        'learning_rate' : args.learning_rate,
+        'n_episodes' : int(sys.argv[0]), #args.n_episodes,
+        'n_hidden_units' : int(sys.argv[1]),
+        'learning_rate' : float(sys.argv[2]),
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
