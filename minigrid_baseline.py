@@ -72,7 +72,7 @@ for episode in range(n_episodes):
 
             n_steps_per_episode.append(steps)
 
-            if episode % 10 == 0:
+            if episode % 1000 == 0:
                 print(f"episode {episode}, n_steps: {steps}\n")
                 print(f"Episode_reward: {sum(rewards)}")
             break
@@ -80,5 +80,5 @@ for episode in range(n_episodes):
     rewards_over_episodes.append(sum(rewards))
 
 
-plt.plot(rewards_over_episodes)
-a = 1
+with open('rewards.pickle', 'wb') as f:
+    pickle.dump(rewards_over_episodes, f)
