@@ -35,8 +35,8 @@ if __name__ == '__main__':
 
         # experiment configuration
         'seed' :  123456789,
-        'n_hidden' : sys.argv[0],
-        'learning_rate' : sys.argv[1],
+        'n_hidden' : sys.argv[1],
+        'learning_rate' : sys.argv[2],
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
