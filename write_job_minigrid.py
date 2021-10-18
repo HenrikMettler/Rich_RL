@@ -22,22 +22,21 @@ if __name__ == '__main__':
         'submit_command': 'sbatch',
         'jobfile_template': 'jobfile_template.jdf',
         'jobname': 'rrl',
-        'wall_clock_limit': '24:00:00',
+        'wall_clock_limit': '00:30:00',
         'ntasks': 6,
         'cpus-per-task': 4,
         'n_nodes': 1,
         'mail-user': 'henrik.mettler@unibe.ch',
         'account': 'ich029m',
         'constraint': 'mc',
-        'partition': 'normal',
+        'partition': 'debug',
         'sim_script': 'minigrid_baseline.py',
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
         'seed' :  123456789,
-        'n_episodes' : sys.argv[0], #args.n_episodes,
-        'n_hidden_units' : sys.argv[1],
-        'learning_rate' : sys.argv[2],
+        'n_hidden_units' : sys.argv[0],
+        'learning_rate' : sys.argv[1],
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
