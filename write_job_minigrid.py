@@ -5,10 +5,6 @@ import os
 import sys
 import argparse
 
-import cgp
-
-from minigrid_baseline import n_episodes
-
 sys.path.insert(0, '../../includes/')
 import write_job_utils as utils
 
