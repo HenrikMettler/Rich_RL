@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
         # experiment configuration
         'seed' :  123456789,
-        'n_hidden_units' : sys.argv[0],
+        'n_hidden' : sys.argv[0],
         'learning_rate' : sys.argv[1],
     }
 
