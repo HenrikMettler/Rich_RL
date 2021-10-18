@@ -2,6 +2,7 @@ import gym
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 from network import Network
 from functions import update_weights, alter_env
@@ -11,11 +12,14 @@ from gym_minigrid.wrappers import FlatObsWrapper, ImgObsWrapper
 
 weight_update_mode = 'autograd'
 
+with open('params.pickle', 'rb') as f:
+    params = pickle.load(f)
+
 seed = 123456789
 torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
-n_episodes: int =  100 #50000
+n_episodes: int =  params['n_episodes'] #50000
 n_steps_max: int = 1000
 env = DynamicMiniGrid(seed=seed)
 env, is_solvable = alter_env(env, n=6)
@@ -23,9 +27,9 @@ env = ImgObsWrapper(env)
 state = env.respawn()["image"].flatten()
 
 n_inputs: int = np.size(state)
-n_hidden: int = 500  # todo: iterate over different sizes
+n_hidden: int = params['n_hidden']  # todo: iterate over different sizes
 n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-learning_rate: float = 1e-4  # todo iterate over different lr's
+learning_rate: float =  params['n_hidden'] #1e-4  # todo iterate over different lr's
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                      learning_rate=learning_rate, weight_update_mode=weight_update_mode)
