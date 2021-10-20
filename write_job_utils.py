@@ -7,7 +7,7 @@ import pickle
 
 def mkdirp(dirname):
     if not os.path.exists(dirname):
-        os.mkdir(dirname)
+        os.makedirs(dirname)
 
 
 def fill_jobfile_template(params, template):
