@@ -19,7 +19,7 @@ seed = 123456789
 torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
-n_episodes: int = 100000
+n_episodes: int = 1000000
 n_steps_max: int = 1000
 env = DynamicMiniGrid(seed=seed)
 env, is_solvable = alter_env(env, n=6)
