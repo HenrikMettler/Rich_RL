@@ -43,7 +43,7 @@ if __name__ == '__main__':
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
     key = dicthash.generate_hash_from_dict(params)
-    results_folder = 'new_results'
+    results_folder = 'Non_normalized_reward'
 
     params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
     params['workingdir'] = os.getcwd()
