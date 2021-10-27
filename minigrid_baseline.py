@@ -19,21 +19,25 @@ seed = 123456789
 torch.manual_seed(seed=seed)
 rng = np.random.default_rng(seed=seed)
 
-n_episodes: int = 1000000
-n_steps_max: int = 1000
+# environement parametrisation
+n_episodes: int = 50000  #100000
+n_steps_max: int = 100 # 1000
 env = DynamicMiniGrid(seed=seed)
 env, is_solvable = alter_env(env, n=6)
 env = ImgObsWrapper(env)
 state = env.respawn()["image"].flatten()
+#env.render()
 
+# network parameterization
 n_inputs: int = np.size(state)
-n_hidden: int = params['n_hidden']  # todo: iterate over different sizes
+n_hidden: int = params['n_hidden']
 n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-learning_rate: float = params['learning_rate'] #1e-4  # todo iterate over different lr's
+learning_rate: float = params['learning_rate'] #1e-4
 
 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                      learning_rate=learning_rate, weight_update_mode=weight_update_mode)
 
+# runs
 n_steps_per_episode: List[int] = []
 rewards_over_episodes: List[float] = []
 
@@ -68,13 +72,13 @@ for episode in range(n_episodes):
                 "hidden_activities": hidden_activities_all,
             }
             update_weights(network=policy_net, **update_params,
-                           weight_update_mode=weight_update_mode)
+                           weight_update_mode=weight_update_mode, normalize_discounted_rewards_b=False)
 
             n_steps_per_episode.append(steps)
 
             if episode % 1000 == 0:
                 print(f"episode {episode}, n_steps: {steps}\n")
-                print(f"Episode_reward: {sum(rewards)}")
+                print(f"Episode_reward: {sum(rewards)}\n")
             break
         state = new_state.flatten()
     rewards_over_episodes.append(sum(rewards))
