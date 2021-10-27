@@ -34,8 +34,8 @@ if __name__ == '__main__':
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
-        'seed':  int[sys.argv[0]],
-        'n_env_alterations': int[sys.argv[1]],
+        'seed':  int(sys.argv[0]),
+        'n_env_alterations': int(sys.argv[1]),
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
