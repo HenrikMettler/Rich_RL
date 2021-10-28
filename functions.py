@@ -9,13 +9,11 @@ from cgp.genome import ID_INPUT_NODE, ID_NON_CODING_GENE, ID_OUTPUT_NODE
 
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
     rewards = torch.Tensor(rewards)
-    N = len(rewards)
-    discounted_rewards = torch.empty(N)
-
-    for t in range(N):
-        gamma_factor = gamma**torch.arange(N-t, dtype=torch.float)
+    n = len(rewards)
+    discounted_rewards = torch.empty(n)
+    for t in range(n):
+        gamma_factor = gamma**torch.arange(n-t, dtype=torch.float)
         discounted_rewards[t] = gamma_factor @ rewards[t:]
-
     return discounted_rewards
 
 
@@ -46,7 +44,6 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
     if normalize_discounted_rewards_b:
         discounted_rewards = normalize_discounted_rewards(discounted_rewards)
 
-    log_probs_t = torch.Tensor(log_probs)
     policy_gradient_list = calculate_policy_gradient_element_wise(
         log_probs=log_probs, discounted_rewards=discounted_rewards)
 
@@ -299,14 +296,13 @@ def compute_key_for_cache(*args):
         # todo: "document" variable
         expected_cum_reward_per_episode = (1 - 1 / n_episodes_reward_expectation) * \
                                           expected_cum_reward_per_episode + \
-                                          (
-                                                      1 / n_episodes_reward_expectation) * cum_reward / n_steps_per_run
+                                          (1 / n_episodes_reward_expectation) * cum_reward \
+                                          / n_steps_per_run
     env.close()
     return float(cum_reward)
 
 
-def alter_env(env, n=10):
-    prob_vector = [0, 0, 0.5, 0, 0.5] # 0.5 adding wall / lava, 0 for start, goal and sand
+def alter_env(env, n, prob_alteration_dict):
     for _ in range(n):
-        is_solvable = env.alter(prob_vector)
+        is_solvable = env.alter(prob_alteration_dict)
     return env, is_solvable
