@@ -22,11 +22,18 @@ if __name__ == "__main__":
     rng = np.random.default_rng(seed=seed)
 
     # environement parametrisation
-    n_episodes: int = 10000
+    prob_alteration_dict ={
+        "alter_start_pos": 0.0,
+        "alter_goal_pos": 0.0,
+        "wall": 0.5,
+        "lava": 0.5,
+        "sand": 0.0,
+    }
+    n_episodes: int = 5000
     n_steps_max: int = 100
     n_env_alterations = params['n_env_alterations']
     env = DynamicMiniGrid(seed=seed)
-    env, is_solvable = alter_env(env, n=n_env_alterations)
+    env, is_solvable = alter_env(env=env, n=n_env_alterations, prob_alteration_dict=prob_alteration_dict)
     env = ImgObsWrapper(env)
     state = env.respawn()["image"].flatten()
     #env.render()
