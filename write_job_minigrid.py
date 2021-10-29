@@ -36,13 +36,20 @@ if __name__ == '__main__':
         # experiment configuration
         'seed':  int(sys.argv[1]),
         'n_env_alterations': int(sys.argv[2]),
+        'prob_alteration_dict': {
+            "alter_start_pos": 0.2,
+            "alter_goal_pos": 0.2,
+            "wall": 0.3,
+            "lava": 0.3,
+            "sand": 0.0,
+        }
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
     key = dicthash.generate_hash_from_dict(params)
-    results_folder = 'Non_normalized_reward'
+    results_folder = 'start_stop_02'
 
     params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
     params['workingdir'] = os.getcwd()
