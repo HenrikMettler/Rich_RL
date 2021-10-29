@@ -22,13 +22,7 @@ if __name__ == "__main__":
     rng = np.random.default_rng(seed=seed)
 
     # environement parametrisation
-    prob_alteration_dict ={
-        "alter_start_pos": 0.0,
-        "alter_goal_pos": 0.0,
-        "wall": 0.5,
-        "lava": 0.5,
-        "sand": 0.0,
-    }
+    prob_alteration_dict = params['prob_alteration_dict']
     n_episodes: int = 5000
     n_steps_max: int = 100
     n_env_alterations = params['n_env_alterations']
