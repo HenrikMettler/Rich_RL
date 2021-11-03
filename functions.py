@@ -304,5 +304,5 @@ def compute_key_for_cache(*args):
 
 def alter_env(env, n, prob_alteration_dict):
     for _ in range(n):
-        is_solvable = env.alter(prob_alteration_dict)
-    return env, is_solvable
+        env.alter(prob_alteration_dict)
+    return env

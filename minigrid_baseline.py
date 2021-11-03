@@ -23,20 +23,21 @@ if __name__ == "__main__":
 
     # environement parametrisation
     prob_alteration_dict = params['prob_alteration_dict']
-    n_episodes: int = 5000
+    n_episodes: int = 5000  # 5000
     n_steps_max: int = 100
     n_env_alterations = params['n_env_alterations']
     env = DynamicMiniGrid(seed=seed)
-    env, is_solvable = alter_env(env=env, n=n_env_alterations, prob_alteration_dict=prob_alteration_dict)
+    env = alter_env(env=env, n=n_env_alterations, prob_alteration_dict=prob_alteration_dict)
     env = ImgObsWrapper(env)
     state = env.respawn()["image"].flatten()
-    #env.render()
+    env.render()
+    plt.savefig('env.png')
 
     # network parameterization
     n_inputs: int = np.size(state)
-    n_hidden: int = 200 #params['n_hidden']
+    n_hidden: int = params['n_hidden']
     n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-    learning_rate: float = 5e-3 #params['learning_rate']
+    learning_rate: float = params['learning_rate']
 
     policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                          learning_rate=learning_rate, weight_update_mode=weight_update_mode)
@@ -87,10 +88,12 @@ if __name__ == "__main__":
             state = new_state.flatten()
         rewards_over_episodes.append(sum(rewards))
 
+    env.respawn()
     save_data = {
         'rewards_over_episodes': rewards_over_episodes,
         'n_steps_per_episode': n_steps_per_episode,
-        'is_solvable': is_solvable,
+        'network': policy_net,
+        'env': env
     }
 
     with open('data.pickle', 'wb') as f:

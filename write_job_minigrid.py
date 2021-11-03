@@ -34,13 +34,15 @@ if __name__ == '__main__':
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
-        'seed':  int(sys.argv[1]),
-        'n_env_alterations': int(sys.argv[2]),
+        'n_hidden': int(sys.argv[1]),
+        'learning_rate': int(sys.argv[2]),
+        'seed':  123456789,
+        'n_env_alterations': 6,
         'prob_alteration_dict': {
-            "alter_start_pos": 0.2,
-            "alter_goal_pos": 0.2,
-            "wall": 0.3,
-            "lava": 0.3,
+            "alter_start_pos": 0,
+            "alter_goal_pos": 0,
+            "wall": 0.5,
+            "lava": 0.5,
             "sand": 0.0,
         }
     }
@@ -49,7 +51,7 @@ if __name__ == '__main__':
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
     key = dicthash.generate_hash_from_dict(params)
-    results_folder = 'start_stop_02'
+    results_folder = 'hidden_lr_scan'
 
     params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
     params['workingdir'] = os.getcwd()
