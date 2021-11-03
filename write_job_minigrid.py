@@ -34,9 +34,6 @@ if __name__ == '__main__':
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
-        'n_hidden': int(sys.argv[1]),
-        'learning_rate': float(sys.argv[2]),
-        'seed':  123456789,
         'n_env_alterations': 6,
         'prob_alteration_dict': {
             "alter_start_pos": 0,
@@ -50,22 +47,33 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    key = dicthash.generate_hash_from_dict(params)
     results_folder = 'hidden_lr_scan'
 
-    params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
-    params['workingdir'] = os.getcwd()
+    n_hidden_array = np.linspace(10,100,10)
+    learning_rates =np.logspace(-4, -1, 20)
+    seeds = np.linspace(1234567890, 1234567899, 9)
+    for seed in seeds:
+        params['seed'] = int(seed)
+        for n_hidden in n_hidden_array:
+            params['n_hidden'] = int(n_hidden)
+            for learning_rate in learning_rates:
+                params['learning_rate'] = learning_rate
 
-    submit_job = True
+                key = dicthash.generate_hash_from_dict(params)
 
-    print('preparing job')
-    print(' ', params['outputdir'])
+                params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
+                params['workingdir'] = os.getcwd()
 
-    utils.mkdirp(params['outputdir'])
-    utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
-    utils.create_jobfile(params)
-    utils.copy_file(params['sim_script'], params['outputdir'])
-    utils.copy_files(params['dependencies'], params['outputdir'])
-    if submit_job:
-        print('submitting job')
-        utils.submit_job(params)
+                submit_job = True
+
+                print('preparing job')
+                print(' ', params['outputdir'])
+
+                utils.mkdirp(params['outputdir'])
+                utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
+                utils.create_jobfile(params)
+                utils.copy_file(params['sim_script'], params['outputdir'])
+                utils.copy_files(params['dependencies'], params['outputdir'])
+                if submit_job:
+                    print('submitting job')
+                    utils.submit_job(params)
