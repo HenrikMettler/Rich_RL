@@ -34,8 +34,8 @@ if __name__ == '__main__':
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
-        'n_hidden': int(sys.argv[0]),
-        'learning_rate': int(sys.argv[1]),
+        'n_hidden': int(sys.argv[1]),
+        'learning_rate': float(sys.argv[2]),
         'seed':  123456789,
         'n_env_alterations': 6,
         'prob_alteration_dict': {
