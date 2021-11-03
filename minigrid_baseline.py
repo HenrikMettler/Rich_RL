@@ -30,8 +30,8 @@ if __name__ == "__main__":
     env = alter_env(env=env, n=n_env_alterations, prob_alteration_dict=prob_alteration_dict)
     env = ImgObsWrapper(env)
     state = env.respawn()["image"].flatten()
-    #env.render()
-    #plt.savefig('env.png')
+    env.render()
+    plt.savefig('env.png')
 
     # network parameterization
     n_inputs: int = np.size(state)
