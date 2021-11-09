@@ -49,31 +49,26 @@ if __name__ == '__main__':
 
     results_folder = 'hidden_lr_scan'
 
-    n_hidden_array = np.linspace(10,100,10)
-    learning_rates =np.logspace(-4, -1, 20)
-    seeds = np.linspace(1234567890, 1234567899, 9)
-    for seed in seeds:
-        params['seed'] = int(seed)
-        for n_hidden in n_hidden_array:
-            params['n_hidden'] = int(n_hidden)
-            for learning_rate in learning_rates:
-                params['learning_rate'] = learning_rate
+    learning_rates = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2]
 
-                key = dicthash.generate_hash_from_dict(params)
+    for learning_rate in learning_rates:
+        params['learning_rate'] = learning_rate
 
-                params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
-                params['workingdir'] = os.getcwd()
+        key = dicthash.generate_hash_from_dict(params)
 
-                submit_job = True
+        params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
+        params['workingdir'] = os.getcwd()
 
-                print('preparing job')
-                print(' ', params['outputdir'])
+        submit_job = True
 
-                utils.mkdirp(params['outputdir'])
-                utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
-                utils.create_jobfile(params)
-                utils.copy_file(params['sim_script'], params['outputdir'])
-                utils.copy_files(params['dependencies'], params['outputdir'])
-                if submit_job:
-                    print('submitting job')
-                    utils.submit_job(params)
+        print('preparing job')
+        print(' ', params['outputdir'])
+
+        utils.mkdirp(params['outputdir'])
+        utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
+        utils.create_jobfile(params)
+        utils.copy_file(params['sim_script'], params['outputdir'])
+        utils.copy_files(params['dependencies'], params['outputdir'])
+        if submit_job:
+            print('submitting job')
+            utils.submit_job(params)

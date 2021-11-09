@@ -17,4 +17,13 @@ date
 echo `hostname`
 cd {outputdir}
 source activate rich_rl
-srun python ./{sim_script}
+srun python ./{sim_script} 10
+srun python ./{sim_script} 20
+srun python ./{sim_script} 30
+srun python ./{sim_script} 40
+srun python ./{sim_script} 50
+srun python ./{sim_script} 60
+srun python ./{sim_script} 70
+srun python ./{sim_script} 80
+srun python ./{sim_script} 90
+srun python ./{sim_script} 100

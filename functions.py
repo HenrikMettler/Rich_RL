@@ -293,7 +293,7 @@ def compute_key_for_cache(*args):
                 break
             state = new_state
 
-        # todo: "document" variable
+        # todo: document variable
         expected_cum_reward_per_episode = (1 - 1 / n_episodes_reward_expectation) * \
                                           expected_cum_reward_per_episode + \
                                           (1 / n_episodes_reward_expectation) * cum_reward \
