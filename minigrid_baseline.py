@@ -16,7 +16,9 @@ if __name__ == "__main__":
     n_hiddens = np.linspace(10,100,10)
 
     for seed in seeds:
+        seed = int(seed)
         for n_hidden in n_hiddens:
+            n_hidden = int(n_hidden)
 
             weight_update_mode = 'autograd'
 
