@@ -6,7 +6,7 @@
 #SBATCH --time {wall_clock_limit}
 #SBATCH --nodes={n_nodes}
 #SBATCH --ntasks-per-core=1
-#SBATCH --ntasks-per-node=36
+#SBATCH --ntasks-per-node=12
 #SBATCH --cpus-per-task=1
 #SBATCH --partition={partition}
 #SBATCH --constraint={constraint}
@@ -17,13 +17,4 @@ date
 echo `hostname`
 cd {outputdir}
 source activate rich_rl
-srun python ./{sim_script} 10
-srun python ./{sim_script} 20
-srun python ./{sim_script} 30
-srun python ./{sim_script} 40
-srun python ./{sim_script} 50
-srun python ./{sim_script} 60
-srun python ./{sim_script} 70
-srun python ./{sim_script} 80
-srun python ./{sim_script} 90
-srun python ./{sim_script} 100
+srun python ./{sim_script}
