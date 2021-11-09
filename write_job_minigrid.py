@@ -47,7 +47,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'hidden_lr_scan'
+    results_folder = 'hidden_lr_scan_new'
 
     learning_rates = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2]
 
