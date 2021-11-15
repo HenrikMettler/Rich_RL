@@ -30,7 +30,7 @@ if __name__ == '__main__':
         'account': 'ich029m',
         'constraint': 'mc',
         'partition': 'normal',
-        'sim_script': 'minigrid_baseline.py',
+        'sim_script': 'minigrid_with_alter.py',
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
