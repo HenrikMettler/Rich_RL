@@ -52,7 +52,6 @@ if __name__ == "__main__":
 
             # environement altering
             env = alter_env(env=env, n=n_alter, prob_alteration_dict=prob_alteration_dict)
-            env = ImgObsWrapper(env)
             env.render()
             env_name = f'env_seed{seed}_nAlterations{n_alter}'
             plt.savefig(env_name)
