@@ -51,7 +51,7 @@ if __name__ == "__main__":
         for n_alter in range(max_n_alterations):
 
             # environement altering
-            env = alter_env(env=env, n=n_alter, prob_alteration_dict=prob_alteration_dict)
+            env = alter_env(env=env, n=1, prob_alteration_dict=prob_alteration_dict)
             env.render()
             env_name = f'env_seed{seed}_nAlterations{n_alter}'
             plt.savefig(env_name)
