@@ -306,3 +306,28 @@ def alter_env(env, n, prob_alteration_dict):
     for _ in range(n):
         env.alter(prob_alteration_dict)
     return env
+
+
+def play_some_episodes_with_trained_agent(data, params):
+    env = data['env']
+    net = data['network']
+    n_episodes = 200
+    n_steps_max = 50
+    rng = np.random.default_rng(seed=params["seed"])
+    states = []
+    agent_positions = []
+    agent_directions = []
+    for episode in range(n_episodes):
+        state = env.respawn()["image"].flatten()
+
+        for steps in range(n_steps_max):
+
+            action, prob, _ = net.get_action(state, rng)
+            new_state, reward, done, _ = env.step(action)
+            states.append(new_state)
+            agent_positions.append(env.agent_pos)
+            agent_directions.append(env.agent_dir)
+
+            if done or steps == n_steps_max - 1:
+                break
+            state = new_state.flatten()
