@@ -35,7 +35,8 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
 
 def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_activities,
                    weight_update_mode: AnyStr = 'autograd',
-                   normalize_discounted_rewards_b = True):
+                   normalize_discounted_rewards_b = True,
+                   rule = None):
     """adapted from: https://medium.com/@thechrisyoon/
     deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
 
@@ -69,10 +70,47 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
         }
         update_output_layer_with_equation4(network, rewards, el_params)
 
+    elif weight_update_mode == 'evolved-rule':
+        if rule == None:
+            raise ValueError('rule must be defined for update with rule')
+        el_params = {
+            "probs": probs,
+            "hidden_activities": hidden_activities,
+            "actions": actions,
+        }
+        el_traces = calc_el_traces(**el_params)
+        update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, rule)
+
     elif weight_update_mode == 'autograd':
         pass  # update done above
     else:
         raise NotImplementedError
+
+
+def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, rule):
+    # update output weights
+    with torch.no_grad():
+        lr = network.learning_rate
+        ones = torch.ones(network.output_layer.weight.size(1)+1)
+        ones = ones.resize(ones.resize_((len(ones), 1)))
+        rewards_torch_expanded = ones * rewards.resize_(1, len(rewards)) # +1 for bias
+
+        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
+
+            weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
+                (rewards_torch_expanded, el_traces[idx_action], rule)
+            weight_vector += lr* weight_updates
+            bias += lr*bias_updates
+
+
+def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule):
+    weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
+    bias_updates = torch.zeros(1).squeeze()
+
+    for idx_time in range(len(rewards,1)):
+        weight_updates += rule(rewards[:-1,idx_time], el_traces[:-1, idx_time])
+        bias_updates += rule(rewards[-1, idx_time], el_traces[-1, idx_time])
+    return weight_updates, bias_updates
 
 
 def update_output_layer_with_equation2(network: Network, discounted_rewards: torch.Tensor, probs,
