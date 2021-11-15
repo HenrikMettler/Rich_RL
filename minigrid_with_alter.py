@@ -48,7 +48,7 @@ if __name__ == "__main__":
         n_steps_per_episode: List[int] = []
         rewards_over_episodes: List[float] = []
 
-        for n_alter in range(max_n_alterations):
+        for n_alter in range(1, max_n_alterations):
 
             # environement altering
             env = alter_env(env=env, n=1, prob_alteration_dict=prob_alteration_dict)
@@ -95,6 +95,7 @@ if __name__ == "__main__":
                                        weight_update_mode=weight_update_mode, normalize_discounted_rewards_b=False)
 
                         n_steps_per_episode.append(steps)
+                        break
 
                     state = new_state.flatten()
                 rewards_over_episodes.append(sum(rewards))
