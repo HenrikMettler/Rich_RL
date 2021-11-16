@@ -8,11 +8,6 @@ import argparse
 sys.path.insert(0, '../../includes/')
 import write_job_utils as utils
 
-"""parser = argparse.ArgumentParser
-parser.add_argument("--n_episodes", required=True)
-parser.add_argument("--n_hidden", required=True)
-parser.add_argument("--learning_rate", required=True)
-args = parser.parse_args()"""
 
 if __name__ == '__main__':
 
@@ -30,11 +25,10 @@ if __name__ == '__main__':
         'account': 'ich029m',
         'constraint': 'mc',
         'partition': 'normal',
-        'sim_script': 'minigrid_with_alter.py',
+        'sim_script': 'minigrid.py',
         'dependencies': ['functions.py', 'network.py'],
 
         # experiment configuration
-        'n_env_alterations': 6,
         'prob_alteration_dict': {
             "alter_start_pos": 0,
             "alter_goal_pos": 0,
@@ -47,11 +41,11 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'subsequent_alterations_run'
+    results_folder = 'cgp_minigrid_run'
 
-    for network_reset_after_alteration in [True, False]:
+    for use_rxet_init in [False, True]:
 
-        params['network_reset_after_alteration'] = network_reset_after_alteration
+        params['use_rxet_init'] = use_rxet_init
         key = dicthash.generate_hash_from_dict(params)
 
         params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
