@@ -123,7 +123,7 @@ def inner_objective(
 
 
 def set_initial_dna(ind):
-    genome = cgp.Genome()
+    genome = cgp.Genome(**genome_params)
     genome.dna = initialize_genome_with_rxet_prior(n_inputs=2,
                                                    n_hidden=128,  # from default in library
                                                    n_operators=4,  # from default in library
