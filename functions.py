@@ -91,10 +91,8 @@ def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, r
     # update output weights
     with torch.no_grad():
         lr = network.learning_rate
-        ones = torch.ones(network.output_layer.weight.size(1)+1)
-        ones = ones.resize(ones.resize_((len(ones), 1)))
-        rewards_torch_expanded = ones * rewards.resize_(1, len(rewards)) # +1 for bias
-
+        rewards_torch_expanded = _expand_reward_in_hidden_layer_dim(rewards,
+                                                                    hidden_layer_dim=network.output_layer.weight.size(1) + 1)
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
 
             weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
@@ -103,13 +101,23 @@ def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, r
             bias += lr*bias_updates
 
 
+def _expand_reward_in_hidden_layer_dim(rewards, hidden_layer_dim):
+    ones = torch.ones(hidden_layer_dim)
+    ones = ones.resize_((len(ones), 1))
+    rewards_t = torch.tensor(rewards)
+    rewards_t.resize_(1, len(rewards))
+    rewards_torch_expanded = ones * rewards_t
+    return rewards_torch_expanded
+
+
 def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule):
     weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
     bias_updates = torch.zeros(1).squeeze()
 
-    for idx_time in range(len(rewards,1)):
-        weight_updates += rule(rewards[:-1,idx_time], el_traces[:-1, idx_time])
-        bias_updates += rule(rewards[-1, idx_time], el_traces[-1, idx_time])
+    for idx_time in range(rewards.shape[1]):
+        updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time]],1))
+        weight_updates += updates[:-1].squeeze()
+        bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates
 
 
