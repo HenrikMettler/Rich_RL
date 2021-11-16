@@ -26,7 +26,7 @@ if __name__ == '__main__':
         'constraint': 'mc',
         'partition': 'normal',
         'sim_script': 'minigrid.py',
-        'dependencies': ['functions.py', 'network.py'],
+        'dependencies': ['functions.py', 'network.py', 'operators.py'],
 
         # experiment configuration
         'prob_alteration_dict': {
