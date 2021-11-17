@@ -63,7 +63,7 @@ def inner_objective(
         n_inputs: int = np.size(state)
         n_hidden: int = 30
         n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-        learning_rate: float = 0.02
+        learning_rate: float = 0.01
 
         policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                              learning_rate=learning_rate, weight_update_mode=weight_update_mode)

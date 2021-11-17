@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     with open('params.pickle', 'rb') as f:
         params = pickle.load(f)
-    weight_update_mode = 'autograd'
+    weight_update_mode = params['weight_update_mode']
 
     max_n_alterations = 10
     network_reset_after_alteration = params['network_reset_after_alteration']
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         n_inputs: int = np.size(state)
         n_hidden: int = 30
         n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-        learning_rate: float = 0.02
+        learning_rate: float = 0.01
 
         policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                              learning_rate=learning_rate, weight_update_mode=weight_update_mode)
@@ -57,6 +57,7 @@ if __name__ == "__main__":
             plt.savefig(env_name)
 
             if network_reset_after_alteration:
+                # Todo: check whether this always uses the same seed
                 policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
                              learning_rate=learning_rate, weight_update_mode=weight_update_mode)
 
