@@ -51,9 +51,9 @@ if __name__ == '__main__':
     #for weight_update_mode in weight_update_modes:
         for reset in [True, False]:
 
-            params['weight_update_mode'] = weight_update_mode
+            #params['weight_update_mode'] = weight_update_mode
             params['network_reset_after_alteration'] = reset
-            #params['use_rxet_init'] = use_rxet_init
+            params['use_rxet_init'] = use_rxet_init
             key = dicthash.generate_hash_from_dict(params)
 
             params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
