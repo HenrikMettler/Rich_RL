@@ -140,7 +140,7 @@ if __name__ == "__main__":
         params = pickle.load(f)
 
     prob_alteration_dict = params['prob_alteration_dict']
-    evolve_params = {"max_objective_calls": 100} # 84600s ≃  23h 30 min
+    evolve_params = {"max_time": 84600}    # 84600s ≃  23h 30 min
     genome_params ={"n_inputs": 2}
 
     if params['use_rxet_init']:
