@@ -43,32 +43,25 @@ if __name__ == '__main__':
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
     results_folder = 'cgp_minigrid_run'
-    #results_folder = 'comp_autograd_eq4'
 
-    #weight_update_modes = ['equation4', 'autograd']
     for use_rxet_init in [False, True]:
 
-    #for weight_update_mode in weight_update_modes:
-        for reset in [True, False]:
+        params['use_rxet_init'] = use_rxet_init
+        key = dicthash.generate_hash_from_dict(params)
 
-            #params['weight_update_mode'] = weight_update_mode
-            params['network_reset_after_alteration'] = reset
-            params['use_rxet_init'] = use_rxet_init
-            key = dicthash.generate_hash_from_dict(params)
+        params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
+        params['workingdir'] = os.getcwd()
 
-            params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
-            params['workingdir'] = os.getcwd()
+        submit_job = True
 
-            submit_job = True
+        print('preparing job')
+        print(' ', params['outputdir'])
 
-            print('preparing job')
-            print(' ', params['outputdir'])
-
-            utils.mkdirp(params['outputdir'])
-            utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
-            utils.create_jobfile(params)
-            utils.copy_file(params['sim_script'], params['outputdir'])
-            utils.copy_files(params['dependencies'], params['outputdir'])
-            if submit_job:
-                print('submitting job')
-                utils.submit_job(params)
+        utils.mkdirp(params['outputdir'])
+        utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
+        utils.create_jobfile(params)
+        utils.copy_file(params['sim_script'], params['outputdir'])
+        utils.copy_files(params['dependencies'], params['outputdir'])
+        if submit_job:
+            print('submitting job')
+            utils.submit_job(params)
