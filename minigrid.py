@@ -140,14 +140,14 @@ if __name__ == "__main__":
         params = pickle.load(f)
 
     prob_alteration_dict = params['prob_alteration_dict']
-    evolve_params = {"max_time": 84600}    # 84600s ≃  23h 30 min
+    max_time = 84600
     genome_params ={"n_inputs": 2}
 
     if params['use_rxet_init']:
         pop = cgp.Population(genome_params=genome_params, individual_init=set_initial_dna)
     else:
         pop = cgp.Population(genome_params=genome_params)
-    ea = cgp.ea.MuPlusLambda()
+    #ea = cgp.ea.MuPlusLambda()
 
     history = {}
     history["fitness_champion"] = []
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     obj = functools.partial(objective, prob_alteration_dict=prob_alteration_dict)
 
     start = time.time()
-    cgp.evolve(obj, pop, ea, **evolve_params, print_progress=True, callback=recording_callback, )
+    cgp.evolve(obj,  max_time=max_time, pop=pop, print_progress=True, callback=recording_callback)
     end = time.time()
     print(f"Time elapsed:", end - start)
 
