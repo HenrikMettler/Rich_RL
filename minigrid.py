@@ -140,14 +140,13 @@ if __name__ == "__main__":
         params = pickle.load(f)
 
     prob_alteration_dict = params['prob_alteration_dict']
-    max_time = 84600
+    max_time = 1000
     genome_params ={"n_inputs": 2}
 
     if params['use_rxet_init']:
         pop = cgp.Population(genome_params=genome_params, individual_init=set_initial_dna)
     else:
         pop = cgp.Population(genome_params=genome_params)
-    #ea = cgp.ea.MuPlusLambda()
 
     history = {}
     history["fitness_champion"] = []
