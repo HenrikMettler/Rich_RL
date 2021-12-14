@@ -21,12 +21,14 @@ from operators import Const05Node, Const2Node
 def objective(
         individual: cgp.IndividualSingleGenome,
         prob_alteration_dict: dict,
+        network_params: dict,
+        env_params: dict,
         ):
 
     if not individual.fitness_is_None():
         return individual
     try:
-        individual.fitness = inner_objective(individual, prob_alteration_dict)
+        individual.fitness = inner_objective(individual, prob_alteration_dict, network_params, env_params)
     except ZeroDivisionError:
         individual.fitness = -np.inf
     return individual
@@ -34,18 +36,22 @@ def objective(
 
 def inner_objective(
     ind: cgp.IndividualSingleGenome,
-    prob_alteration_dict: dict
+    prob_alteration_dict: dict,
+    network_params: dict,
+    env_params: dict,
 ) -> float:
 
     t = ind.to_torch()
+    # todo: reduce alterations and iterations move parameters to write job
+    # reduce evaluation time per individual such that 500 gen per day is feasible
+    # implement hurdle on first environment (perf measure)
+    
+    seeds = env_params["seeds"] #np.linspace(1234567890, 1234567899, 9)
 
-    seeds = np.linspace(1234567890, 1234567899, 9)
-
-    weight_update_mode = 'evolved-rule'
-
-    max_n_alterations = 10
-    n_episodes_per_alteration: int = 2000
-    n_steps_max: int = 100
+    max_n_alterations = env_params["max_n_alterations"] #10
+    n_alterations_per_new_env = env_params["n_alterations_per_new_env"]
+    n_episodes_per_alteration = env_params["n_episodes_per_alteration"]
+    n_steps_max = env_params["n_steps_max"]
 
     reward_per_seed_mean = []
     for seed in seeds:
@@ -54,19 +60,12 @@ def inner_objective(
         torch.manual_seed(seed=seed)
         rng = np.random.default_rng(seed=seed)
 
-        # general environment parametrisation
+        # environment and network initialization
         env = DynamicMiniGrid(seed=seed)
         env = ImgObsWrapper(env)
         state = env.respawn()["image"].flatten()
 
-        # network parameterization
-        n_inputs: int = np.size(state)
-        n_hidden: int = 30
-        n_outputs: int = 3  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-        learning_rate: float = 0.01
-
-        policy_net = Network(n_inputs=n_inputs, n_hidden=n_hidden, n_outputs=n_outputs,
-                             learning_rate=learning_rate, weight_update_mode=weight_update_mode)
+        policy_net = Network(n_inputs=np.size(state), **network_params)
 
         n_steps_per_episode: List[int] = []
         rewards_over_episodes: List[float] = []
@@ -74,7 +73,7 @@ def inner_objective(
         for n_alter in range(1, max_n_alterations):
 
             # environement altering
-            env = alter_env(env=env, n=1, prob_alteration_dict=prob_alteration_dict)
+            env = alter_env(env=env, n=n_alterations_per_new_env, prob_alteration_dict=prob_alteration_dict)
 
             # runs
             for episode in range(n_episodes_per_alteration):
@@ -107,7 +106,7 @@ def inner_objective(
                             "actions": actions,
                             "hidden_activities": hidden_activities_all,
                         }
-                        update_weights(network=policy_net, **update_params, weight_update_mode=weight_update_mode,
+                        update_weights(network=policy_net, **update_params, weight_update_mode='evolved-rule',
                                        normalize_discounted_rewards_b=False, rule=t)
 
                         n_steps_per_episode.append(steps)
@@ -139,9 +138,16 @@ if __name__ == "__main__":
     with open('params.pickle', 'rb') as f:
         params = pickle.load(f)
 
+    # parse params
     prob_alteration_dict = params['prob_alteration_dict']
-    max_time = 1000
-    genome_params ={"n_inputs": 2}
+    network_params = params['network_params']
+    env_params = params['env_params']
+    max_time = params['max_time']
+    genome_params = params['genome_params']  # {"n_inputs": 2}
+    ea_params = params['ea_params']  # {'n_processes':4,}
+
+    # initialize EA and Population
+    ea = cgp.ea.MuPlusLambda(**ea_params)
 
     if params['use_rxet_init']:
         pop = cgp.Population(genome_params=genome_params, individual_init=set_initial_dna)
@@ -156,10 +162,11 @@ if __name__ == "__main__":
         history["fitness_champion"].append(pop.champion.fitness)
         history["expression_champion"].append(pop.champion.to_sympy())
 
-    obj = functools.partial(objective, prob_alteration_dict=prob_alteration_dict)
+    obj = functools.partial(objective, prob_alteration_dict=prob_alteration_dict,
+                            network_params=network_params, env_params=env_params)
 
     start = time.time()
-    cgp.evolve(obj,  max_time=max_time, pop=pop, print_progress=True, callback=recording_callback)
+    cgp.evolve(obj,  max_time=max_time, ea=ea, pop=pop, print_progress=True, callback=recording_callback)
     end = time.time()
     print(f"Time elapsed:", end - start)
 

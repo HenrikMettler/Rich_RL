@@ -35,9 +35,30 @@ if __name__ == '__main__':
             "wall": 0.5,
             "lava": 0.5,
             "sand": 0.0,
-        }
-    }
+        },
 
+        # network parameterization
+        'network_params': {
+            'n_hidden': 30,
+            'n_outputs': 3,  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
+            'learning_rate': 0.01,
+            'weight_update_mode': 'evolved-rule',
+        },
+
+        # environment parameterization:
+        'env_params': {
+            'max_n_alterations': 4,
+            'n_alterations_per_new_env': 3,
+            'n_episodes_per_alteration': 2000,
+            'seeds': np.linspace(1234567890, 1234567899, 4),
+            'n_steps_max': 100,
+        },
+
+        # cgp parameterisation
+        'max_time': 82800,  # 82800s~23h
+        'genome_params': {"n_inputs": 2, },
+        'ea_params': {'n_processes': 4, },
+    }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
