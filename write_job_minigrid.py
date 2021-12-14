@@ -63,7 +63,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'cgp_minigrid_run'
+    results_folder = 'cgp_minigrid_run_with_cache'
 
     for use_rxet_init in [False, True]:
 

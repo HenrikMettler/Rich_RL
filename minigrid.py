@@ -34,6 +34,9 @@ def objective(
     return individual
 
 
+@cgp.utils.disk_cache(
+    "cache.pkl", compute_key=cgp.utils.compute_key_from_sympy_expr_and_args
+)
 def inner_objective(
     ind: cgp.IndividualSingleGenome,
     prob_alteration_dict: dict,
@@ -42,10 +45,7 @@ def inner_objective(
 ) -> float:
 
     t = ind.to_torch()
-    # todo: reduce alterations and iterations move parameters to write job
-    # reduce evaluation time per individual such that 500 gen per day is feasible
-    # implement hurdle on first environment (perf measure)
-    
+
     seeds = env_params["seeds"] #np.linspace(1234567890, 1234567899, 9)
 
     max_n_alterations = env_params["max_n_alterations"] #10
