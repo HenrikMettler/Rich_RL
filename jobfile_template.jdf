@@ -6,8 +6,8 @@
 #SBATCH --time {wall_clock_limit}
 #SBATCH --nodes={n_nodes}
 #SBATCH --ntasks-per-core=1
-#SBATCH --ntasks-per-node=12
-#SBATCH --cpus-per-task=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=4
 #SBATCH --partition={partition}
 #SBATCH --constraint={constraint}
 #SBATCH --hint=nomultithread
