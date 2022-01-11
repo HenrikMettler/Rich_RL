@@ -43,6 +43,7 @@ if __name__ == '__main__':
             'n_outputs': 3,  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
             'learning_rate': 0.01,
             'weight_update_mode': 'evolved-rule',
+            'beta': 1.0
         },
 
         # environment parameterization:
@@ -55,7 +56,7 @@ if __name__ == '__main__':
         },
 
         # cgp parameterisation
-        'max_time': 82800,  # 82800s~23h
+        'max_time': 100, #82800,  # 82800s~23h
         'genome_params': {"n_inputs": 2, },
         'ea_params': {'n_processes': 4, },
     }
