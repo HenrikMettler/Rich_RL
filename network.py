@@ -11,7 +11,7 @@ from typing import Callable, List, Tuple, Union
 class Network(nn.Module):
     """ Network class"""
 
-    def __init__(self, n_inputs: int, n_hidden: int, n_outputs: int, learning_rate: float,
+    def __init__(self, n_inputs: int, n_hidden: int, n_outputs: int, learning_rate: float, beta: float = 1.0,
                  weight_update_mode='autograd')\
             -> None:
         """ Init function
@@ -44,6 +44,9 @@ class Network(nn.Module):
         # optimizer for baseline with policy gradient
         self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
 
+        # softmax shaping
+        self.beta = beta
+
     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """ Compute a forward pass in the network and return output and hidden activities
 
@@ -64,8 +67,7 @@ class Network(nn.Module):
         # https://medium.com/@thechrisyoon/
         # deriving-policy-gradients-and-implementing-reinforce-f887949bd63
         hidden_activities: torch.Tensor = F.relu(self.hidden_layer(state))
-        output_activities: torch.Tensor = F.softmax(
-            self.output_layer(hidden_activities), dim=1)
+        output_activities: torch.Tensor = F.softmax(self.beta * self.output_layer(hidden_activities), dim=1)
 
         return hidden_activities, output_activities
 
