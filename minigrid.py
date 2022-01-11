@@ -35,7 +35,7 @@ def objective(
 
 
 @cgp.utils.disk_cache(
-    "cache.pkl", compute_key=cgp.utils.compute_key_from_sympy_expr_and_args
+    "cache.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
 )
 def inner_objective(
     ind: cgp.IndividualSingleGenome,
