@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     results_folder = 'cgp_minigrid_run_with_cache'
 
-    for use_rxet_init in [False, True]:
+    for use_rxet_init in [True, False]:
 
         params['use_rxet_init'] = use_rxet_init
         key = dicthash.generate_hash_from_dict(params)

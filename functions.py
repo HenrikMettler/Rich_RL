@@ -7,6 +7,58 @@ from typing import AnyStr, List
 from cgp.genome import ID_INPUT_NODE, ID_NON_CODING_GENE, ID_OUTPUT_NODE
 
 
+def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, rng):
+
+    rewards_over_episodes = []
+    temporal_novelty = 1
+    # runs
+    for episode in range(n_episodes):
+        reward = play_episode(net, env, rule, n_steps_max, rng)
+        rewards_over_episodes.append(reward)
+        temporal_novelty *= temporal_novelty_decay
+    return rewards_over_episodes
+
+
+def play_episode(net, env, rule, n_steps_max, rng):
+
+    state = env.respawn()["image"].flatten()
+    log_probs: List[torch.Tensor] = []
+    probs: List[float] = []
+    actions: List[int] = []
+    hidden_activities_all = []
+    rewards: List[float] = []
+
+    for steps in range(n_steps_max):
+
+        action, prob, hidden_activities = net.get_action(state, rng)
+
+        hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
+        log_prob = torch.log(prob.squeeze(0)[action])
+
+        new_state, reward, done, _ = env.step(action)
+        log_probs.append(log_prob)
+        probs.append(prob)
+        actions.append(action)
+        rewards.append(reward)
+        hidden_activities_all.append(hidden_activities)
+
+        if done or steps == n_steps_max - 1:
+            update_params = {
+                "rewards": rewards,
+                "probs": probs,
+                "log_probs": log_probs,
+                "actions": actions,
+                "hidden_activities": hidden_activities_all,
+            }
+            update_weights(network=net, **update_params, weight_update_mode='evolved-rule',
+                           normalize_discounted_rewards_b=False, rule=rule)
+
+            break
+
+        state = new_state.flatten()
+    return np.sum(rewards)
+
+
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
     rewards = torch.Tensor(rewards)
     n = len(rewards)

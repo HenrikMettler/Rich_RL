@@ -14,7 +14,7 @@ from gym_minigrid.envs.dynamic_minigrid import DynamicMiniGrid
 from gym_minigrid.wrappers import ImgObsWrapper
 
 from network import Network
-from functions import alter_env, update_weights, initialize_genome_with_rxet_prior
+from functions import alter_env, play_episodes, initialize_genome_with_rxet_prior
 from operators import Const05Node, Const2Node
 
 
@@ -46,9 +46,9 @@ def inner_objective(
 
     t = ind.to_torch()
 
-    seeds = env_params["seeds"] #np.linspace(1234567890, 1234567899, 9)
+    seeds = env_params["seeds"]
 
-    max_n_alterations = env_params["max_n_alterations"] #10
+    max_n_alterations = env_params["max_n_alterations"]
     n_alterations_per_new_env = env_params["n_alterations_per_new_env"]
     n_episodes_per_alteration = env_params["n_episodes_per_alteration"]
     n_steps_max = env_params["n_steps_max"]
@@ -67,8 +67,7 @@ def inner_objective(
 
         policy_net = Network(n_inputs=np.size(state), **network_params)
 
-        n_steps_per_episode: List[int] = []
-        rewards_over_episodes: List[float] = []
+        rewards_over_alterations: List[float] = []
 
         for n_alter in range(1, max_n_alterations):
 
@@ -76,47 +75,12 @@ def inner_objective(
             env = alter_env(env=env, n=n_alterations_per_new_env, prob_alteration_dict=prob_alteration_dict)
 
             # runs
-            for episode in range(n_episodes_per_alteration):
-                state = env.respawn()["image"].flatten()
-                log_probs: List[torch.Tensor] = []
-                probs: List[float] = []
-                actions: List[int] = []
-                hidden_activities_all = []
-                rewards: List[float] = []
-
-                for steps in range(n_steps_max):
-
-                    action, prob, hidden_activities = policy_net.get_action(state, rng)
-
-                    hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
-                    log_prob = torch.log(prob.squeeze(0)[action])
-
-                    new_state, reward, done, _ = env.step(action)
-                    log_probs.append(log_prob)
-                    probs.append(prob)
-                    actions.append(action)
-                    rewards.append(reward)
-                    hidden_activities_all.append(hidden_activities)
-
-                    if done or steps == n_steps_max-1:
-                        update_params = {
-                            "rewards": rewards,
-                            "probs": probs,
-                            "log_probs": log_probs,
-                            "actions": actions,
-                            "hidden_activities": hidden_activities_all,
-                        }
-                        update_weights(network=policy_net, **update_params, weight_update_mode='evolved-rule',
-                                       normalize_discounted_rewards_b=False, rule=t)
-
-                        n_steps_per_episode.append(steps)
-                        break
-
-                    state = new_state.flatten()
-                rewards_over_episodes.append(sum(rewards))
-
+            rewards_over_episodes = play_episodes(env=env, net=policy_net, rule=t, n_episodes=n_episodes_per_alteration,
+                                                  n_steps_max=n_steps_max, rng=rng)
+            rewards_over_alterations.append(np.mean(rewards_over_episodes))
             env.respawn()
-        reward_per_seed_mean.append(np.mean(rewards_over_episodes))
+
+        reward_per_seed_mean.append(np.mean(rewards_over_alterations))
     reward_mean = np.mean(reward_per_seed_mean)
     return float(reward_mean)
 
