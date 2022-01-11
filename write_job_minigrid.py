@@ -53,6 +53,7 @@ if __name__ == '__main__':
             'n_episodes_per_alteration': 2000,
             'seeds': np.linspace(1234567890, 1234567899, 4),
             'n_steps_max': 100,
+            'temporal_novelty_decay': 0.99
         },
 
         # cgp parameterisation

@@ -4,8 +4,6 @@ import numpy as np
 from network import Network
 from typing import AnyStr, List
 
-from cgp.genome import ID_INPUT_NODE, ID_NON_CODING_GENE, ID_OUTPUT_NODE
-
 
 def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, rng):
 
@@ -309,95 +307,6 @@ def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob,
             bias_update = updates[-1]
             weight_vector += lr * weight_update
             bias += lr * bias_update
-
-
-def update_weights_with_rule():
-    raise NotImplementedError
-
-
-def initialize_genome_with_rxet_prior(n_inputs, n_hidden, n_operators, max_arity, rng):
-    max_arity += 1 # account for operator gene not counted in arity
-    dna = []
-    # add inputs
-    for idx in range(n_inputs*max_arity):
-        if idx%max_arity == 0:
-            dna.append(ID_INPUT_NODE)
-        else:
-            dna.append(ID_NON_CODING_GENE)
-
-    # add r*et prior
-    dna.append(0)  # Assuming Mul is the first operator
-    dna.append(0)  # Assuming r is the first input
-    dna.append(1)  # Assuming et is the second input
-
-    # add random n_hidden-1 genes
-    for idx in range(max_arity,n_hidden*max_arity):  # start at max_arity because 1st gene is set
-        if idx%max_arity == 0:
-            dna.append(rng.integers(low=0,high=n_operators))  # (address 4)
-        else:
-            dna.append(rng.integers(low=0,high=int(idx/max_arity)+n_inputs))
-
-    # add output
-    dna.append(ID_OUTPUT_NODE)
-    dna.append(n_inputs) # r*et has node-index of n_inputs
-    dna.append(ID_NON_CODING_GENE)
-
-    return dna
-
-
-def compute_key_for_cache(*args):
-    ind = args[0]
-    t = args[1]
-    network = args[2]
-    env = args[3]
-    seed = args[4]
-    rng = args[5]
-    gamma = args[7]
-    n_steps_per_run = 200
-    n_episodes = 10
-    n_episodes_reward_expectation = 100
-
-    env.seed(seed)
-    cum_reward = 0
-    episode_counter = 0
-    expected_cum_reward_per_episode = 0
-    while episode_counter < n_episodes:
-        state = env.reset()
-        el_traces = torch.zeros(
-            [network.output_layer.out_features, network.output_layer.in_features + 1])
-        discounted_reward = 0
-
-        for _ in range(n_steps_per_run):
-            action, probs, hidden_activities = network.get_action(state, rng)
-
-            hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
-            log_prob = torch.log(probs.squeeze(0)[action])
-
-            new_state, reward, done, _ = env.step(action)
-            discounted_reward *= gamma
-            discounted_reward += reward
-            cum_reward += reward
-
-            el_traces = update_el_traces(el_traces, probs, hidden_activities, action)
-
-            update_weights_online_with_rule(rule=t, network=network, reward=reward,
-                                            el_traces=el_traces,
-                                            log_prob=log_prob, discounted_reward=discounted_reward,
-                                            done=done,
-                                            expected_cum_reward_per_episode=expected_cum_reward_per_episode)
-
-            if done:
-                episode_counter += 1
-                break
-            state = new_state
-
-        # todo: document variable
-        expected_cum_reward_per_episode = (1 - 1 / n_episodes_reward_expectation) * \
-                                          expected_cum_reward_per_episode + \
-                                          (1 / n_episodes_reward_expectation) * cum_reward \
-                                          / n_steps_per_run
-    env.close()
-    return float(cum_reward)
 
 
 def alter_env(env, n, prob_alteration_dict):

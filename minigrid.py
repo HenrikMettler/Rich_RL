@@ -14,7 +14,7 @@ from gym_minigrid.envs.dynamic_minigrid import DynamicMiniGrid
 from gym_minigrid.wrappers import ImgObsWrapper
 
 from network import Network
-from functions import alter_env, play_episodes, initialize_genome_with_rxet_prior
+from functions import alter_env, play_episodes
 from operators import Const05Node, Const2Node
 
 
@@ -53,6 +53,8 @@ def inner_objective(
     n_episodes_per_alteration = env_params["n_episodes_per_alteration"]
     n_steps_max = env_params["n_steps_max"]
 
+    temporal_novelty_decay = env_params["temporal_novelty_decay"]
+
     reward_per_seed_mean = []
     for seed in seeds:
         seed = int(seed)
@@ -76,7 +78,8 @@ def inner_objective(
 
             # runs
             rewards_over_episodes = play_episodes(env=env, net=policy_net, rule=t, n_episodes=n_episodes_per_alteration,
-                                                  n_steps_max=n_steps_max, rng=rng)
+                                                  n_steps_max=n_steps_max,
+                                                  temporal_novelty_decay=temporal_novelty_decay, rng=rng)
             rewards_over_alterations.append(np.mean(rewards_over_episodes))
             env.respawn()
 
@@ -87,12 +90,10 @@ def inner_objective(
 
 def set_initial_dna(ind):
     genome = cgp.Genome(**genome_params)
-    genome.dna = initialize_genome_with_rxet_prior(n_inputs=2,
-                                                   n_hidden=128,  # from default in library
-                                                   n_operators=4,  # from default in library
-                                                   max_arity=2,
-                                                   rng=np.random.default_rng(seed=1234)
-                                                   )
+    genome.randomize(rng=np.random.RandomState(seed=1234))
+
+    dna_prior = [2, 0, 1]  # Mul as 3rd operator (2), r as first (0), el as second (1) input
+    genome.set_expression_for_output(new_dna=dna_prior)
 
     return cgp.IndividualSingleGenome(genome)
 
