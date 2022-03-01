@@ -62,8 +62,7 @@ for episode in range(n_epsisodes):
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
             }
-            update_weights(network=policy_net, **update_params,
-                           weight_update_mode=weight_update_mode)
+            update_weights(network=policy_net, weight_update_mode=weight_update_mode, **update_params)
 
             n_steps_per_episode.append(steps)
 

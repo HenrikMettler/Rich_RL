@@ -54,7 +54,7 @@ for episode in range(n_epsisodes):
 
         el_traces = update_el_traces(el_traces, probs, hidden_activities, action)
 
-        update_weights_online(network=online_net, reward=reward,  el_traces=el_traces,
+        update_weights_online_with_policy_gradient(network=online_net, reward=reward,  el_traces=el_traces,
                               log_prob=log_prob, discounted_reward = discounted_reward)
 
         if done:
