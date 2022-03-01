@@ -58,19 +58,19 @@ if __name__ == '__main__':
         # update parameterization
         'update_params': {
             'temporal_novelty_decay': 0.99,
-            'mode': 'online',  # options: online, offline
+            'mode': 'offline',  # options: online, offline
         },
 
         # cgp parameterisation
         'max_time': 100, #82800,  # 82800s~23h
-        'genome_params': {"n_inputs": 4, },
+        'genome_params': {"n_inputs": 3, },
         'ea_params': {'n_processes': 4, },
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'cgp_minigrid_run_with_cache'
+    results_folder = 'offline_with_temp_nov'
 
     for use_rxet_init in [True, False]:
 
