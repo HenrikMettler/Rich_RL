@@ -53,12 +53,17 @@ if __name__ == '__main__':
             'n_episodes_per_alteration': 2000,
             'seeds': np.linspace(1234567890, 1234567899, 4),
             'n_steps_max': 100,
-            'temporal_novelty_decay': 0.99
+        },
+
+        # update parameterization
+        'update_params': {
+            'temporal_novelty_decay': 0.99,
+            'mode': 'online',  # options: online, offline
         },
 
         # cgp parameterisation
         'max_time': 100, #82800,  # 82800s~23h
-        'genome_params': {"n_inputs": 2, },
+        'genome_params': {"n_inputs": 4, },
         'ea_params': {'n_processes': 4, },
     }
 
