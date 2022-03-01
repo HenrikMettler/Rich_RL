@@ -27,7 +27,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
     actions: List[int] = []
     hidden_activities_all = []
     rewards: List[float] = []
-    el_traces = torch.zeros([net.output_layer.out_feature, net.output_layer.out_features+1]) # +1 for bias
+    el_traces = torch.zeros([net.output_layer.out_features, net.output_layer.in_features+1]) # +1 for bias
 
     for steps in range(n_steps_max):
 

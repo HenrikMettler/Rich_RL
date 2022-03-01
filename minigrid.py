@@ -23,12 +23,13 @@ def objective(
         prob_alteration_dict: dict,
         network_params: dict,
         env_params: dict,
-        ):
+        update_params: dict,
+):
 
     if not individual.fitness_is_None():
         return individual
     try:
-        individual.fitness = inner_objective(individual, prob_alteration_dict, network_params, env_params)
+        individual.fitness = inner_objective(individual, prob_alteration_dict, network_params, env_params, update_params)
     except ZeroDivisionError:
         individual.fitness = -np.inf
     return individual
