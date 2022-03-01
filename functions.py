@@ -56,9 +56,50 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
                            rule=rule, **update_params)
 
             break
+        if update_mode == 'online':
+            el_traces = update_el_traces(el_traces=el_traces, probs=probs, hidden_activities=hidden_activities,
+                                         action=action)
+            spatial_novelty_position = env.spatial_novelty_grid[env.agent_pos]
+            update_output_weights_online_with_rule(rule=rule, net=net, reward=reward, el_traces=el_traces,
+                                                   temporal_novelty=temporal_novelty,
+                                                   spatial_novelty=spatial_novelty_position)
+
+            if done or steps == n_steps_max -1:
+                # todo: implement update of inp-hidden layer
+                # update inp-hidden layer only at the end of episode
+                update_inp_hidden_weights_offline(net, rewards, log_probs)
+                break
 
         state = new_state.flatten()
     return np.sum(rewards)
+
+
+def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discounted_rewards_b=False ):
+
+    discounted_rewards = calculate_discounted_rewards(rewards)
+
+    if normalize_discounted_rewards_b:
+        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+
+    policy_gradient_list = calculate_policy_gradient_element_wise(
+        log_probs=log_probs, discounted_rewards=discounted_rewards)
+
+    net.optimizer.zero_grad()
+    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+    policy_gradient.backward()
+    net.optimizer.step()
+
+
+def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
+
+    with torch.no_grad():
+        lr = net.learning_rate
+        for idx_action, (weight_vector, bias) in enumerate(zip(net.output_layer.weight, net.output_layer.bias)):
+            updates = rule(reward, el_traces[idx_action,:], temporal_novelty, spatial_novelty)
+            weight_update = updates[:-1]
+            bias_update = updates[-1]
+            weight_vector -= lr * weight_update
+            bias -= lr * bias_update
 
 
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
