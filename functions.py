@@ -128,12 +128,12 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
     return policy_gradient_list
 
 
-def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_activities,
+def update_weights_offline(network: Network, rewards, log_probs, probs, actions, hidden_activities,
+                   temporal_novelty=None,
                    weight_update_mode: AnyStr = 'autograd',
                    normalize_discounted_rewards_b = True,
                    rule = None):
-    """adapted from: https://medium.com/@thechrisyoon/
-    deriving-policy-gradients-and-implementing-reinforce-f887949bd63"""
+
 
     discounted_rewards = calculate_discounted_rewards(rewards)
     # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
@@ -174,7 +174,7 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
             "actions": actions,
         }
         el_traces = calc_el_traces(**el_params)
-        update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, rule)
+        update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, temporal_novelty, rule)
 
     elif weight_update_mode == 'autograd':
         pass  # update done above
@@ -182,16 +182,20 @@ def update_weights(network: Network, rewards, log_probs, probs, actions, hidden_
         raise NotImplementedError
 
 
-def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, rule):
+def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, temporal_novelty, rule):
     # update output weights
     with torch.no_grad():
         lr = network.learning_rate
         rewards_torch_expanded = _expand_reward_in_hidden_layer_dim(rewards,
                                                                     hidden_layer_dim=network.output_layer.weight.size(1) + 1)
+
+        # todo: there is a potential issue with expanding the temporal novelty this way
+        #  -> in the beginning it is of much bigger amplitude than the other signals
+        temporal_novelty_expanded = temporal_novelty * torch.ones([network.output_layer.weight.size(1) + 1, len(rewards)])
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
 
             weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
-                (rewards_torch_expanded, el_traces[idx_action], rule)
+                (rewards_torch_expanded, el_traces[idx_action], rule, temporal_novelty_expanded)
             weight_vector += lr* weight_updates
             bias += lr*bias_updates
 
@@ -205,12 +209,15 @@ def _expand_reward_in_hidden_layer_dim(rewards, hidden_layer_dim):
     return rewards_torch_expanded
 
 
-def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule):
+def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None):
     weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
     bias_updates = torch.zeros(1).squeeze()
 
     for idx_time in range(rewards.shape[1]):
-        updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time]],1))
+        if temporal_novelty is None:
+            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time]],1))
+        else:
+            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time]],1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates
@@ -306,7 +313,7 @@ def update_el_traces(el_traces, probs, hidden_activities, action, gamma=0.9):
     return el_traces
 
 
-def update_weights_online(network, reward,  el_traces, log_prob, discounted_reward):
+def update_weights_online_with_policy_gradient(network, reward,  el_traces, log_prob, discounted_reward):
     policy_gradient = -log_prob * discounted_reward
 
     network.optimizer.zero_grad()
@@ -328,33 +335,33 @@ def compute_weight_bias_update_online(reward, el_traces_per_output):
     return -reward*el_traces_per_output
 
 
-def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward,
-                                    done, expected_cum_reward_per_episode):
-    policy_gradient = -log_prob * discounted_reward
-
-    network.optimizer.zero_grad()
-    policy_gradient.backward()
-    network.optimizer.step()
-
-    # update_output weights
-    with torch.no_grad():
-        lr = network.learning_rate
-        rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
-        done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
-        expected_cum_reward_per_episode_torch_expanded = expected_cum_reward_per_episode * torch.ones_like(
-            rewards_torch_expanded)
-
-        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-        # todo: check if possible to set updates values into weight_vector to save them for update at next time step
-            updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:],
-                                        done_torch_expanded, expected_cum_reward_per_episode_torch_expanded],1)).squeeze()
-            weight_update = updates[:-1]
-            bias_update = updates[-1]
-            weight_vector += lr * weight_update
-            bias += lr * bias_update
+# def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward,
+#                                     done, expected_cum_reward_per_episode):
+#     policy_gradient = -log_prob * discounted_reward
+#
+#     network.optimizer.zero_grad()
+#     policy_gradient.backward()
+#     network.optimizer.step()
+#
+#     # update_output weights
+#     with torch.no_grad():
+#         lr = network.learning_rate
+#         rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
+#         done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
+#         expected_cum_reward_per_episode_torch_expanded = expected_cum_reward_per_episode * torch.ones_like(
+#             rewards_torch_expanded)
+#
+#         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
+#             updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:],
+#                                         done_torch_expanded, expected_cum_reward_per_episode_torch_expanded],1)).squeeze()
+#             weight_update = updates[:-1]
+#             bias_update = updates[-1]
+#             weight_vector += lr * weight_update
+#             bias += lr * bias_update
 
 
 def alter_env(env, n, prob_alteration_dict):
+    env.reset_spatial_novelty_grid()  # reset the spatial novelty grid before alterations
     for _ in range(n):
         env.alter(prob_alteration_dict)
     return env
