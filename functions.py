@@ -43,16 +43,17 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
         rewards.append(reward)
         hidden_activities_all.append(hidden_activities)
 
-        if done or steps == n_steps_max - 1:
+        if (done or steps == n_steps_max - 1) and update_mode == 'offline':
             update_params = {
                 "rewards": rewards,
                 "probs": probs,
                 "log_probs": log_probs,
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
+                'temporal_novelty': temporal_novelty,
             }
-            update_weights(network=net, **update_params, weight_update_mode='evolved-rule',
-                           normalize_discounted_rewards_b=False, rule=rule)
+            update_weights_offline(network=net, weight_update_mode='evolved-rule', normalize_discounted_rewards_b=False,
+                           rule=rule, **update_params)
 
             break
 
