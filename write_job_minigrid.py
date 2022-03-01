@@ -58,19 +58,19 @@ if __name__ == '__main__':
         # update parameterization
         'update_params': {
             'temporal_novelty_decay': 0.99,
-            'mode': 'offline',  # options: online, offline
+            'mode': 'online',  # options: online, offline
         },
 
         # cgp parameterisation
         'max_time': 100, #82800,  # 82800s~23h
-        'genome_params': {"n_inputs": 3, },
+        'genome_params': {"n_inputs": 4, },
         'ea_params': {'n_processes': 4, },
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'offline_with_temp_nov'
+    results_folder = 'online_with_temp_and_spat_nov'
 
     for use_rxet_init in [True, False]:
 
