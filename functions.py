@@ -5,26 +5,29 @@ from network import Network
 from typing import AnyStr, List
 
 
-def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, rng):
+def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, update_mode, rng):
 
     rewards_over_episodes = []
     temporal_novelty = 1
     # runs
     for episode in range(n_episodes):
-        reward = play_episode(net, env, rule, n_steps_max, rng)
+        reward = play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng)
         rewards_over_episodes.append(reward)
         temporal_novelty *= temporal_novelty_decay
+        env.spatial_novelty_grid_time_decay()
     return rewards_over_episodes
 
 
-def play_episode(net, env, rule, n_steps_max, rng):
+def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng):
 
     state = env.respawn()["image"].flatten()
+    spatial_novelty_grid = env.spatial_novelty_grid
     log_probs: List[torch.Tensor] = []
     probs: List[float] = []
     actions: List[int] = []
     hidden_activities_all = []
     rewards: List[float] = []
+    el_traces = torch.zeros([net.output_layer.out_feature, net.output_layer.out_features+1]) # +1 for bias
 
     for steps in range(n_steps_max):
 
