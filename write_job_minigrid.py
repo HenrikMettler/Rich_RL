@@ -64,7 +64,7 @@ if __name__ == '__main__':
         # cgp parameterisation
         'max_time': 100, #82800,  # 82800s~23h
         'genome_params': {"n_inputs": 4, },
-        'ea_params': {'n_processes': 4, },
+        'ea_params': {'n_processes': 1, },
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
