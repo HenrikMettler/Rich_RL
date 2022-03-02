@@ -5,20 +5,20 @@ from network import Network
 from typing import AnyStr, List
 
 
-def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, update_mode, rng):
+def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, rng):
 
     rewards_over_episodes = []
     temporal_novelty = 1
     # runs
     for episode in range(n_episodes):
-        reward = play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng)
+        reward = play_episode(env, net, rule, n_steps_max, temporal_novelty, rng)
         rewards_over_episodes.append(reward)
         temporal_novelty *= temporal_novelty_decay
         env.spatial_novelty_grid_time_decay()
     return rewards_over_episodes
 
 
-def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng):
+def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
     state = env.respawn()["image"].flatten()
     spatial_novelty_grid = env.spatial_novelty_grid
@@ -27,7 +27,8 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
     actions: List[int] = []
     hidden_activities_all = []
     rewards: List[float] = []
-    el_traces = torch.zeros([net.output_layer.out_features, net.output_layer.in_features+1]) # +1 for bias
+    el_traces = torch.zeros([net.output_layer.out_features, net.output_layer.in_features+1])  # +1 for bias
+    spatial_novelty_signals = []
 
     for steps in range(n_steps_max):
 
@@ -42,8 +43,19 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
         actions.append(action)
         rewards.append(reward)
         hidden_activities_all.append(hidden_activities)
+        spatial_novelty_currently = env.spatial_novelty_grid[env.agent_pos[0], env.agent_pos[1]]
+        spatial_novelty_signals.append(spatial_novelty_currently)
 
-        if (done or steps == n_steps_max - 1) and update_mode == 'offline':
+
+        #update_inp_hidden_weights_offline(net, rewards, log_probs)
+
+        #el_traces = update_el_traces(el_traces=el_traces, probs=probs[0], hidden_activities=hidden_activities,
+        #                             action=action)  # probs[0]
+        #update_output_weights_online_with_rule(rule=rule, net=net, reward=reward, el_traces=el_traces,
+        #                                       temporal_novelty=temporal_novelty,
+        #                                       spatial_novelty=spatial_novelty_position)
+
+        if done or steps == n_steps_max -1:
             update_params = {
                 "rewards": rewards,
                 "probs": probs,
@@ -51,25 +63,13 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
                 'temporal_novelty': temporal_novelty,
+                'spatial_novelty': spatial_novelty_signals
             }
-            update_weights_offline(network=net, weight_update_mode='evolved-rule', normalize_discounted_rewards_b=False,
-                           rule=rule, **update_params)
+            update_weights_offline(network=net, weight_update_mode='evolved-rule',
+                                    normalize_discounted_rewards_b=False,
+                                    rule=rule, **update_params)
 
             break
-        if update_mode == 'online':
-
-            if done or steps == n_steps_max -1:
-                # update inp-hidden layer only at the end of episode, but before the other to avoid torch
-                # in place modification issues
-                update_inp_hidden_weights_offline(net, rewards, log_probs)
-                break
-
-            el_traces = update_el_traces(el_traces=el_traces, probs=probs[0], hidden_activities=hidden_activities,
-                                         action=action)  # probs[0]
-            spatial_novelty_position = env.spatial_novelty_grid[env.agent_pos[0], env.agent_pos[1]]
-            update_output_weights_online_with_rule(rule=rule, net=net, reward=reward, el_traces=el_traces,
-                                                   temporal_novelty=temporal_novelty,
-                                                   spatial_novelty=spatial_novelty_position)
 
         state = new_state.flatten()
     return np.sum(rewards)
@@ -88,7 +88,7 @@ def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discoun
     torch.autograd.set_detect_anomaly(True)
     net.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    policy_gradient.backward()
+    policy_gradient.backward(retain_graph=True)
     net.optimizer.step()
 
 
@@ -140,6 +140,7 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
 
 def update_weights_offline(network: Network, rewards, log_probs, probs, actions, hidden_activities,
                    temporal_novelty=None,
+                   spatial_novelty=None,
                    weight_update_mode: AnyStr = 'autograd',
                    normalize_discounted_rewards_b = True,
                    rule = None):
@@ -184,7 +185,8 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
             "actions": actions,
         }
         el_traces = calc_el_traces(**el_params)
-        update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, temporal_novelty, rule)
+        update_output_layer_with_evolved_rule_offline(rule=rule, network=network, rewards=rewards, el_traces=el_traces,
+                                                      temporal_novelty=temporal_novelty, spatial_novelty=spatial_novelty)
 
     elif weight_update_mode == 'autograd':
         pass  # update done above
@@ -192,42 +194,46 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
         raise NotImplementedError
 
 
-def update_output_layer_with_evolved_rule_offline(network, rewards, el_traces, temporal_novelty, rule):
+def update_output_layer_with_evolved_rule_offline(rule, network, rewards, el_traces, temporal_novelty, spatial_novelty):
     # update output weights
     with torch.no_grad():
         lr = network.learning_rate
-        rewards_torch_expanded = _expand_reward_in_hidden_layer_dim(rewards,
-                                                                    hidden_layer_dim=network.output_layer.weight.size(1) + 1)
-
-        # todo: there is a potential issue with expanding the temporal novelty this way
-        #  -> in the beginning it is of much bigger amplitude than the other signals
+        rewards_expanded = _expand_signal_in_hidden_layer_dim(signal=rewards,
+                                                              hidden_layer_dim=network.output_layer.weight.size(1) + 1)
+        spatial_novelty_expanded = _expand_signal_in_hidden_layer_dim(signal=spatial_novelty,
+                                                        hidden_layer_dim=network.output_layer.weight.size(1) + 1)
         temporal_novelty_expanded = temporal_novelty * torch.ones([network.output_layer.weight.size(1) + 1, len(rewards)])
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
 
             weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
-                (rewards_torch_expanded, el_traces[idx_action], rule, temporal_novelty_expanded)
+                (rewards_expanded, el_traces[idx_action], rule, temporal_novelty_expanded, spatial_novelty_expanded)
             weight_vector += lr* weight_updates
             bias += lr*bias_updates
 
 
-def _expand_reward_in_hidden_layer_dim(rewards, hidden_layer_dim):
+def _expand_signal_in_hidden_layer_dim(signal, hidden_layer_dim):
     ones = torch.ones(hidden_layer_dim)
     ones = ones.resize_((len(ones), 1))
-    rewards_t = torch.tensor(rewards)
-    rewards_t.resize_(1, len(rewards))
-    rewards_torch_expanded = ones * rewards_t
-    return rewards_torch_expanded
+    signal_t = torch.tensor(signal)
+    signal_t.resize_(1, len(signal))
+    signal_torch_expanded = ones * signal_t
+    return signal_torch_expanded
 
 
-def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None):
+def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None, spatial_novelty=None):
     weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
     bias_updates = torch.zeros(1).squeeze()
 
     for idx_time in range(rewards.shape[1]):
-        if temporal_novelty is None:
+        if temporal_novelty is None and spatial_novelty is None:
             updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time]],1))
-        else:
+        elif spatial_novelty is None:
             updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time]],1))
+        elif temporal_novelty is None:
+            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], spatial_novelty[:, idx_time]],1))
+        else:
+            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time],
+                                        spatial_novelty[:, idx_time]],1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates

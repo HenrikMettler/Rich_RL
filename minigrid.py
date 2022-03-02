@@ -23,13 +23,12 @@ def objective(
         prob_alteration_dict: dict,
         network_params: dict,
         env_params: dict,
-        update_params: dict,
 ):
 
     if not individual.fitness_is_None():
         return individual
     try:
-        individual.fitness = inner_objective(individual, prob_alteration_dict, network_params, env_params, update_params)
+        individual.fitness = inner_objective(individual, prob_alteration_dict, network_params, env_params)
     except ZeroDivisionError:
         individual.fitness = -np.inf
     return individual
@@ -43,7 +42,6 @@ def inner_objective(
     prob_alteration_dict: dict,
     network_params: dict,
     env_params: dict,
-    update_params: dict,
 ) -> float:
 
     t = ind.to_torch()
@@ -54,9 +52,7 @@ def inner_objective(
     n_alterations_per_new_env = env_params["n_alterations_per_new_env"]
     n_episodes_per_alteration = env_params["n_episodes_per_alteration"]
     n_steps_max = env_params["n_steps_max"]
-
-    temporal_novelty_decay = update_params["temporal_novelty_decay"]
-    update_mode = update_params['mode']
+    temporal_novelty_decay = env_params["temporal_novelty_decay"]
 
     reward_per_seed_mean = []
     for seed in seeds:
@@ -83,8 +79,8 @@ def inner_objective(
             rewards_over_episodes = play_episodes(env=env, net=policy_net, rule=t,
                                                   n_episodes=n_episodes_per_alteration, n_steps_max=n_steps_max,
                                                   temporal_novelty_decay=temporal_novelty_decay,
-                                                  update_mode=update_mode,
                                                   rng=rng)
+
             rewards_over_alterations.append(np.mean(rewards_over_episodes))
             env.respawn()
 
@@ -114,7 +110,6 @@ if __name__ == "__main__":
     prob_alteration_dict = params['prob_alteration_dict']
     network_params = params['network_params']
     env_params = params['env_params']
-    update_params = params['update_params']
     max_time = params['max_time']
     genome_params = params['genome_params']  # {"n_inputs": 2}
     ea_params = params['ea_params']  # {'n_processes':4,}
@@ -136,8 +131,7 @@ if __name__ == "__main__":
         history["expression_champion"].append(pop.champion.to_sympy())
 
     obj = functools.partial(objective, prob_alteration_dict=prob_alteration_dict,
-                            network_params=network_params, env_params=env_params,
-                            update_params=update_params)
+                            network_params=network_params, env_params=env_params)
 
     start = time.time()
     cgp.evolve(obj,  max_time=max_time, ea=ea, pop=pop, print_progress=True, callback=recording_callback)

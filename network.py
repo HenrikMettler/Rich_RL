@@ -74,7 +74,7 @@ class Network(nn.Module):
     def get_action(self, state: np.ndarray, rng: np.random.Generator) -> Tuple[np.ndarray,
                                                                                torch.Tensor, torch.Tensor]:
         state = torch.from_numpy(state).float().unsqueeze(0)
-        hidden_activities, probs = self.forward(Variable(state))
+        hidden_activities, probs = self.forward(state)
         # Todo: use torch generator instead of numpy rng
         try:
             selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
