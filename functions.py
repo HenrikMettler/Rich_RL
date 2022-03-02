@@ -57,18 +57,19 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, update_mode, rng
 
             break
         if update_mode == 'online':
-            el_traces = update_el_traces(el_traces=el_traces, probs=probs, hidden_activities=hidden_activities,
-                                         action=action)
-            spatial_novelty_position = env.spatial_novelty_grid[env.agent_pos]
+
+            if done or steps == n_steps_max -1:
+                # update inp-hidden layer only at the end of episode, but before the other to avoid torch
+                # in place modification issues
+                update_inp_hidden_weights_offline(net, rewards, log_probs)
+                break
+
+            el_traces = update_el_traces(el_traces=el_traces, probs=probs[0], hidden_activities=hidden_activities,
+                                         action=action)  # probs[0]
+            spatial_novelty_position = env.spatial_novelty_grid[env.agent_pos[0], env.agent_pos[1]]
             update_output_weights_online_with_rule(rule=rule, net=net, reward=reward, el_traces=el_traces,
                                                    temporal_novelty=temporal_novelty,
                                                    spatial_novelty=spatial_novelty_position)
-
-            if done or steps == n_steps_max -1:
-                # todo: implement update of inp-hidden layer
-                # update inp-hidden layer only at the end of episode
-                update_inp_hidden_weights_offline(net, rewards, log_probs)
-                break
 
         state = new_state.flatten()
     return np.sum(rewards)
@@ -84,6 +85,7 @@ def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discoun
     policy_gradient_list = calculate_policy_gradient_element_wise(
         log_probs=log_probs, discounted_rewards=discounted_rewards)
 
+    torch.autograd.set_detect_anomaly(True)
     net.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
     policy_gradient.backward()
@@ -92,12 +94,20 @@ def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discoun
 
 def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
 
+    # expand scalar values in dimensionality of hidden_layer (incl bias)
+    n = net.output_layer.in_features + 1
+    reward_expanded = reward*torch.ones(n)
+    temporal_novelty_expanded = temporal_novelty*torch.ones(n)
+    spatial_novelty_expanded = spatial_novelty*torch.ones(n)
+
     with torch.no_grad():
         lr = net.learning_rate
         for idx_action, (weight_vector, bias) in enumerate(zip(net.output_layer.weight, net.output_layer.bias)):
-            updates = rule(reward, el_traces[idx_action,:], temporal_novelty, spatial_novelty)
-            weight_update = updates[:-1]
-            bias_update = updates[-1]
+            updates = rule(torch.stack([reward_expanded, el_traces[idx_action,:],
+                                        temporal_novelty_expanded, spatial_novelty_expanded], 1))
+
+            weight_update = updates[:-1].squeeze()
+            bias_update = updates[-1].squeeze()
             weight_vector -= lr * weight_update
             bias -= lr * bias_update
 
