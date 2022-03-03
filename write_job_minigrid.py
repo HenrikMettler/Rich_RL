@@ -65,7 +65,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'temp_nov'
+    results_folder = 'spat_nov'
 
     for use_rxet_init in [True, False]:
 
