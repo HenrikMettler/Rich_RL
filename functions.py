@@ -46,15 +46,6 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
         spatial_novelty_currently = env.spatial_novelty_grid[env.agent_pos[0], env.agent_pos[1]]
         spatial_novelty_signals.append(spatial_novelty_currently)
 
-
-        #update_inp_hidden_weights_offline(net, rewards, log_probs)
-
-        #el_traces = update_el_traces(el_traces=el_traces, probs=probs[0], hidden_activities=hidden_activities,
-        #                             action=action)  # probs[0]
-        #update_output_weights_online_with_rule(rule=rule, net=net, reward=reward, el_traces=el_traces,
-        #                                       temporal_novelty=temporal_novelty,
-        #                                       spatial_novelty=spatial_novelty_position)
-
         if done or steps == n_steps_max -1:
             update_params = {
                 "rewards": rewards,
