@@ -54,7 +54,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
                 'temporal_novelty': temporal_novelty,
-                'spatial_novelty': spatial_novelty_signals
+                #'spatial_novelty': spatial_novelty_signals
             }
             update_weights_offline(network=net, weight_update_mode='evolved-rule',
                                     normalize_discounted_rewards_b=False,
@@ -191,9 +191,16 @@ def update_output_layer_with_evolved_rule_offline(rule, network, rewards, el_tra
         lr = network.learning_rate
         rewards_expanded = _expand_signal_in_hidden_layer_dim(signal=rewards,
                                                               hidden_layer_dim=network.output_layer.weight.size(1) + 1)
-        spatial_novelty_expanded = _expand_signal_in_hidden_layer_dim(signal=spatial_novelty,
+        if spatial_novelty is not None:
+            spatial_novelty_expanded = _expand_signal_in_hidden_layer_dim(signal=spatial_novelty,
                                                         hidden_layer_dim=network.output_layer.weight.size(1) + 1)
-        temporal_novelty_expanded = temporal_novelty * torch.ones([network.output_layer.weight.size(1) + 1, len(rewards)])
+        else:
+            spatial_novelty_expanded = None
+        if temporal_novelty is not None:
+            temporal_novelty_expanded = temporal_novelty * torch.ones([network.output_layer.weight.size(1) + 1, len(rewards)])
+        else:
+            temporal_novelty_expanded = None
+
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
 
             weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
