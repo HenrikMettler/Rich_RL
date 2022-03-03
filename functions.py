@@ -54,7 +54,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
                 #'temporal_novelty': temporal_novelty,
-                'spatial_novelty': spatial_novelty_signals
+                #'spatial_novelty': spatial_novelty_signals
             }
             update_weights_offline(network=net, weight_update_mode='evolved-rule',
                                     normalize_discounted_rewards_b=False,

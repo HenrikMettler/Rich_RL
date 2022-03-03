@@ -58,14 +58,14 @@ if __name__ == '__main__':
 
         # cgp parameterisation
         'max_time': 82800,  # 82800s~23h
-        'genome_params': {"n_inputs": 3, },
+        'genome_params': {"n_inputs": 2, },
         'ea_params': {'n_processes': 4, },
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'spat_nov'
+    results_folder = 'no_novelty_signals'
 
     for use_rxet_init in [True, False]:
 
