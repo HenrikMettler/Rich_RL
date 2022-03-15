@@ -14,7 +14,7 @@ from gym_minigrid.envs.dynamic_minigrid import DynamicMiniGrid
 from gym_minigrid.wrappers import ImgObsWrapper
 
 from network import Network
-from functions import alter_env, play_episodes
+from functions import play_episodes
 from operators import Const05Node, Const2Node
 
 
@@ -53,6 +53,8 @@ def inner_objective(
     n_episodes_per_alteration = env_params["n_episodes_per_alteration"]
     n_steps_max = env_params["n_steps_max"]
     temporal_novelty_decay = env_params["temporal_novelty_decay"]
+    spatial_novelty_time_decay = env_params["spatial_novelty_time_decay"]
+    spatial_novelty_distance_decay = env_params["spatial_novelty_distance_decay"]
 
     reward_per_seed_mean = []
     for seed in seeds:
@@ -73,12 +75,14 @@ def inner_objective(
         for n_alter in range(1, max_n_alterations):
 
             # environement altering
-            env = alter_env(env=env, n=n_alterations_per_new_env, prob_alteration_dict=prob_alteration_dict)
+            env.alter_env(n=n_alterations_per_new_env, prob_alteration_dict=prob_alteration_dict,
+                            spatial_novelty_distance_decay=spatial_novelty_distance_decay)
 
             # runs
             rewards_over_episodes = play_episodes(env=env, net=policy_net, rule=t,
                                                   n_episodes=n_episodes_per_alteration, n_steps_max=n_steps_max,
                                                   temporal_novelty_decay=temporal_novelty_decay,
+                                                  spatial_novelty_time_decay=spatial_novelty_time_decay,
                                                   rng=rng)
 
             rewards_over_alterations.append(np.mean(rewards_over_episodes))
@@ -122,10 +126,10 @@ if __name__ == "__main__":
     else:
         pop = cgp.Population(genome_params=genome_params)
 
+    # Todo: writing the history like this is not good, sympy expressions can not be pickled (i think)
     history = {}
     history["fitness_champion"] = []
     history["expression_champion"] = []
-
     def recording_callback(pop):
         history["fitness_champion"].append(pop.champion.fitness)
         history["expression_champion"].append(pop.champion.to_sympy())
