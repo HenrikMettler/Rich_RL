@@ -5,7 +5,7 @@ from network import Network
 from typing import AnyStr, List
 
 
-def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, rng):
+def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng):
 
     rewards_over_episodes = []
     temporal_novelty = 1
@@ -14,7 +14,7 @@ def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_deca
         reward = play_episode(env, net, rule, n_steps_max, temporal_novelty, rng)
         rewards_over_episodes.append(reward)
         temporal_novelty *= temporal_novelty_decay
-        env.spatial_novelty_grid_time_decay()
+        env.spatial_novelty_grid_time_decay(spatial_novelty_time_decay)
     return rewards_over_episodes
 
 
@@ -83,24 +83,24 @@ def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discoun
     net.optimizer.step()
 
 
-def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
-
-    # expand scalar values in dimensionality of hidden_layer (incl bias)
-    n = net.output_layer.in_features + 1
-    reward_expanded = reward*torch.ones(n)
-    temporal_novelty_expanded = temporal_novelty*torch.ones(n)
-    spatial_novelty_expanded = spatial_novelty*torch.ones(n)
-
-    with torch.no_grad():
-        lr = net.learning_rate
-        for idx_action, (weight_vector, bias) in enumerate(zip(net.output_layer.weight, net.output_layer.bias)):
-            updates = rule(torch.stack([reward_expanded, el_traces[idx_action,:],
-                                        temporal_novelty_expanded, spatial_novelty_expanded], 1))
-
-            weight_update = updates[:-1].squeeze()
-            bias_update = updates[-1].squeeze()
-            weight_vector -= lr * weight_update
-            bias -= lr * bias_update
+# def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
+#
+#     # expand scalar values in dimensionality of hidden_layer (incl bias)
+#     n = net.output_layer.in_features + 1
+#     reward_expanded = reward*torch.ones(n)
+#     temporal_novelty_expanded = temporal_novelty*torch.ones(n)
+#     spatial_novelty_expanded = spatial_novelty*torch.ones(n)
+#
+#     with torch.no_grad():
+#         lr = net.learning_rate_hid2out
+#         for idx_action, (weight_vector, bias) in enumerate(zip(net.output_layer.weight, net.output_layer.bias)):
+#             updates = rule(torch.stack([reward_expanded, el_traces[idx_action,:],
+#                                         temporal_novelty_expanded, spatial_novelty_expanded], 1))
+#
+#             weight_update = updates[:-1].squeeze()
+#             bias_update = updates[-1].squeeze()
+#             weight_vector -= lr * weight_update
+#             bias -= lr * bias_update
 
 
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
@@ -188,7 +188,7 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 def update_output_layer_with_evolved_rule_offline(rule, network, rewards, el_traces, temporal_novelty, spatial_novelty):
     # update output weights
     with torch.no_grad():
-        lr = network.learning_rate
+        lr = network.learning_rate_hid2out
         rewards_expanded = _expand_signal_in_hidden_layer_dim(signal=rewards,
                                                               hidden_layer_dim=network.output_layer.weight.size(1) + 1)
         if spatial_novelty is not None:
@@ -241,7 +241,7 @@ def update_output_layer_with_equation2(network: Network, discounted_rewards: tor
                                        actions, hidden_activities):
     """ manual update of output weights and biases"""
     with torch.no_grad(): # to prevent interference with backward
-        lr = network.learning_rate
+        lr = network.learning_rate_hid2out
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = compute_weight_bias_updates_equation2(actions, idx_action,
                                                             discounted_rewards, probs, hidden_activities)
@@ -273,7 +273,7 @@ def update_output_layer_with_equation4(network: Network, rewards: List[float],
 
     # update output weights
     with torch.no_grad():
-        lr = network.learning_rate
+        lr = network.learning_rate_hid2out
         el_traces = calc_el_traces(**el_params)
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
 
@@ -336,7 +336,7 @@ def update_weights_online_with_policy_gradient(network, reward,  el_traces, log_
 
     # update output weights
     with torch.no_grad():
-        lr = network.learning_rate
+        lr = network.learning_rate_hid2out
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = compute_weight_bias_update_online(reward, el_traces[idx_action,:])
             weight_update = updates[:-1]
@@ -359,7 +359,7 @@ def compute_weight_bias_update_online(reward, el_traces_per_output):
 #
 #     # update_output weights
 #     with torch.no_grad():
-#         lr = network.learning_rate
+#         lr = network.learning_rate_hid2out
 #         rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
 #         done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
 #         expected_cum_reward_per_episode_torch_expanded = expected_cum_reward_per_episode * torch.ones_like(
@@ -372,13 +372,6 @@ def compute_weight_bias_update_online(reward, el_traces_per_output):
 #             bias_update = updates[-1]
 #             weight_vector += lr * weight_update
 #             bias += lr * bias_update
-
-
-def alter_env(env, n, prob_alteration_dict):
-    env.reset_spatial_novelty_grid()  # reset the spatial novelty grid before alterations
-    for _ in range(n):
-        env.alter(prob_alteration_dict)
-    return env
 
 
 def play_some_episodes_with_trained_agent(data, params):
