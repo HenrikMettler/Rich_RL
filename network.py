@@ -11,8 +11,8 @@ from typing import Callable, List, Tuple, Union
 class Network(nn.Module):
     """ Network class"""
 
-    def __init__(self, n_inputs: int, n_hidden: int, n_outputs: int, learning_rate: float, beta: float = 1.0,
-                 weight_update_mode='autograd')\
+    def __init__(self, n_inputs: int, n_hidden: int, n_outputs: int, learning_rate_inp2hid: float,
+                 learning_rate_hid2out: float, beta: float = 1.0, weight_update_mode='autograd')\
             -> None:
         """ Init function
         
@@ -24,8 +24,10 @@ class Network(nn.Module):
             Number of hidden layer neurons
         n_outputs: int
             Number of output neurons (should be the dimension of the action space)
-        learning_rate: float
-            Learning rate
+        learning_rate_inp2hid: float
+            Learning rate for weights (and bias) from input to hidden layer
+        learning_rate_hid2out: float
+            Learning rate for weights (and bias) from hidden to output layer
         """
 
         super().__init__()
@@ -34,15 +36,16 @@ class Network(nn.Module):
         self.hidden_layer = nn.Linear(n_inputs, n_hidden)
         self.output_layer = nn.Linear(n_hidden, n_outputs)
 
-        self.learning_rate = learning_rate
+        self.learning_rate_inp2hid = learning_rate_inp2hid
+        self.learning_rate_hid2out = learning_rate_hid2out
 
         # turn off autograd in output layer, unless using autograd
         if not weight_update_mode == 'autograd':
             for parameter in self.output_layer.parameters():
                 parameter.requires_grad = False
 
-        # optimizer for baseline with policy gradient
-        self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate)
+        # optimizer for baseline with policy gradient or inp to hidden layer weight
+        self.optimizer = optim.SGD(self.parameters(), lr=self.learning_rate_inp2hid)
 
         # softmax shaping
         self.beta = beta
