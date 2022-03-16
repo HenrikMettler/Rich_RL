@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     results_folder = 'n_hidden_scan_with_no_backprop'
 
-    n_hidden_array = [30, 50, 100, 150, 200, 300, 400, 500, 1000]
+    n_hidden_array = [300, 400, 500, 1000]
 
     for n_hidden in n_hidden_array:
 
