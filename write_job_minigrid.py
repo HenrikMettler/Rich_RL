@@ -1,9 +1,7 @@
 import dicthash
-import json
 import numpy as np
 import os
 import sys
-import argparse
 
 sys.path.insert(0, '../../includes/')
 import write_job_utils as utils
@@ -41,8 +39,8 @@ if __name__ == '__main__':
         'network_params': {
             'n_hidden': 30,
             'n_outputs': 3,  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
-            'learning_rate_inp2hid': 0.01,
-            'learning_rate_hid2out': 0.0,
+            'learning_rate_inp2hid': 0.0,
+            'learning_rate_hid2out': 0.01,
             'weight_update_mode': 'evolved-rule',
             'beta': 1.0
         },
@@ -63,16 +61,20 @@ if __name__ == '__main__':
         'max_time':  100,  # 82800s~23h
         'genome_params': {"n_inputs": 2, },
         'ea_params': {'n_processes': 4, },
+        'use_rxet_init': True,
+
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'no_output_learning'
+    results_folder = 'n_hidden_scan_with_no_backprop'
 
-    for use_rxet_init in [True, False]:
+    n_hidden_array = [30, 50, 100, 150, 200, 300, 400, 500, 1000]
 
-        params['use_rxet_init'] = use_rxet_init
+    for n_hidden in n_hidden_array:
+
+        params['network_params']['n_hidden'] = n_hidden
         key = dicthash.generate_hash_from_dict(params)
 
         params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
