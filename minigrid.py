@@ -66,7 +66,7 @@ def inner_objective(
         # environment and network initialization
         env = DynamicMiniGrid(seed=seed)
         env = ImgObsWrapper(env)
-        state = env.respawn()["image"].flatten()
+        state = env.respawn()["image"][:,:,0].flatten()
 
         policy_net = Network(n_inputs=np.size(state), **network_params)
 
@@ -130,9 +130,10 @@ if __name__ == "__main__":
     history = {}
     history["fitness_champion"] = []
     history["expression_champion"] = []
+
     def recording_callback(pop):
         history["fitness_champion"].append(pop.champion.fitness)
-        history["expression_champion"].append(pop.champion.to_sympy())
+        history["expression_champion"].append(str(pop.champion.to_sympy()))
 
     obj = functools.partial(objective, prob_alteration_dict=prob_alteration_dict,
                             network_params=network_params, env_params=env_params)

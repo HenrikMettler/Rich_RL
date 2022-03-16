@@ -20,7 +20,7 @@ def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_deca
 
 def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
-    state = env.respawn()["image"].flatten()
+    state = env.respawn()["image"][:,:,0].flatten()
     spatial_novelty_grid = env.spatial_novelty_grid
     log_probs: List[torch.Tensor] = []
     probs: List[float] = []
@@ -62,25 +62,25 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
             break
 
-        state = new_state.flatten()
+        state = new_state[:,:,0].flatten()
     return np.sum(rewards)
 
 
-def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discounted_rewards_b=False ):
-
-    discounted_rewards = calculate_discounted_rewards(rewards)
-
-    if normalize_discounted_rewards_b:
-        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
-
-    policy_gradient_list = calculate_policy_gradient_element_wise(
-        log_probs=log_probs, discounted_rewards=discounted_rewards)
-
-    torch.autograd.set_detect_anomaly(True)
-    net.optimizer.zero_grad()
-    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    policy_gradient.backward(retain_graph=True)
-    net.optimizer.step()
+# def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discounted_rewards_b=False ):
+#
+#     discounted_rewards = calculate_discounted_rewards(rewards)
+#
+#     if normalize_discounted_rewards_b:
+#         discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+#
+#     policy_gradient_list = calculate_policy_gradient_element_wise(
+#         log_probs=log_probs, discounted_rewards=discounted_rewards)
+#
+#     torch.autograd.set_detect_anomaly(True)
+#     net.optimizer.zero_grad()
+#     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+#     policy_gradient.backward(retain_graph=True)
+#     net.optimizer.step()
 
 
 # def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
