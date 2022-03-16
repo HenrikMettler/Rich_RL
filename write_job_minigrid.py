@@ -42,7 +42,7 @@ if __name__ == '__main__':
             'n_hidden': 30,
             'n_outputs': 3,  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
             'learning_rate_inp2hid': 0.0,
-            'learning_rate_hid2out': 0.01,
+            'learning_rate_hid2out': 0.0,
             'weight_update_mode': 'evolved-rule',
             'beta': 1.0
         },
@@ -60,7 +60,7 @@ if __name__ == '__main__':
         },
 
         # cgp parameterisation
-        'max_time':  18000,  # 82800s~23h
+        'max_time':  100,  # 82800s~23h
         'genome_params': {"n_inputs": 2, },
         'ea_params': {'n_processes': 4, },
     }
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'no_novelty_signals'
+    results_folder = 'no_learning_lr00'
 
     for use_rxet_init in [True, False]:
 
