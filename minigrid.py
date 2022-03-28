@@ -85,8 +85,7 @@ def calculate_validation_fitness(champion, seed, network_params, env_params):
 
     rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **env_params, rng=rng)
 
-    reward = np.mean(rewards_over_alterations)
-    return reward
+    return np.mean(rewards_over_alterations)
 
 
 def set_initial_dna(ind):
@@ -145,7 +144,8 @@ if __name__ == "__main__":
         # todo evaluate rule on one curriculum with new seed
         history['validated_champion_expression'].append(str(champion.to_sympy()))
         seed = int(env_params['seeds'][-1] +100)
-        calculate_validation_fitness(champion, seed, network_params, env_params)
+        reward = calculate_validation_fitness(champion, seed, network_params, env_params)
+        history['validation_fitness'].append(reward)
     print(f"Time elapsed:", end - start)
 
     max_fitness = history["fitness_champion"][-1]
