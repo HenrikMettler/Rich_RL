@@ -5,6 +5,27 @@ from network import Network
 from typing import AnyStr, List
 
 
+# todo: ask J: is **_ a good solution to ignore seeds?
+def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict, spatial_novelty_distance_decay,
+                   n_episodes_per_alteration, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng, **_):
+
+    rewards_over_alterations: List[float] = []
+
+    for _ in range(1, max_n_alterations):
+
+        env.alter_env(n_alterations=n_alterations_per_new_env, prob_alteration_dict=prob_alteration_dict,
+                      spatial_novelty_distance_decay=spatial_novelty_distance_decay)
+        rewards_over_episodes = play_episodes(env=env, net=net, rule=rule,
+                                              n_episodes=n_episodes_per_alteration, n_steps_max=n_steps_max,
+                                              temporal_novelty_decay=temporal_novelty_decay,
+                                              spatial_novelty_time_decay=spatial_novelty_time_decay,
+                                              rng=rng)
+
+        rewards_over_alterations.append(np.mean(rewards_over_episodes))
+
+    return rewards_over_alterations
+
+
 def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng):
 
     rewards_over_episodes = []
@@ -21,13 +42,11 @@ def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_deca
 def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
     state = env.respawn()["image"][:,:,0].flatten()
-    spatial_novelty_grid = env.spatial_novelty_grid
     log_probs: List[torch.Tensor] = []
     probs: List[float] = []
     actions: List[int] = []
     hidden_activities_all = []
     rewards: List[float] = []
-    el_traces = torch.zeros([net.output_layer.out_features, net.output_layer.in_features+1])  # +1 for bias
     spatial_novelty_signals = []
 
     for steps in range(n_steps_max):
@@ -53,8 +72,8 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
                 "log_probs": log_probs,
                 "actions": actions,
                 "hidden_activities": hidden_activities_all,
-                #'temporal_novelty': temporal_novelty,
-                #'spatial_novelty': spatial_novelty_signals
+                'temporal_novelty': temporal_novelty,
+                'spatial_novelty': spatial_novelty_signals
             }
             update_weights_offline(network=net, weight_update_mode='evolved-rule',
                                     normalize_discounted_rewards_b=False,
@@ -147,7 +166,7 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 
     network.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    policy_gradient.backward()
+    policy_gradient.backward()  # this doesn't update the hidden to output weights, since they have require_grad=False
     network.optimizer.step()
 
     if weight_update_mode == 'equation2':
