@@ -27,17 +27,10 @@ if __name__ == '__main__':
         'dependencies': ['functions.py', 'network.py', 'operators.py'],
 
         # experiment configuration
-        'prob_alteration_dict': {
-            "alter_start_pos": 0,
-            "alter_goal_pos": 0,
-            "wall": 0.5,
-            "lava": 0.5,
-            "sand": 0.0,
-        },
 
         # network parameterization
         'network_params': {
-            'n_hidden': 30,
+            'n_hidden': 400,
             'n_outputs': 3,  # Left, right, forward (pick up, drop, toggle, done are ingnored); env.action_space.n
             'learning_rate_inp2hid': 0.0,
             'learning_rate_hid2out': 0.01,
@@ -50,46 +43,59 @@ if __name__ == '__main__':
             'max_n_alterations': 4,
             'n_alterations_per_new_env': 3,
             'n_episodes_per_alteration': 2000,
-            'seeds': np.linspace(1234567890, 1234567899, 4),
+            #'seeds': np.linspace(1234567890, 1234567899, 4),
             'n_steps_max': 100,
             'temporal_novelty_decay': 0.99,
             'spatial_novelty_time_decay': 0.99,
             'spatial_novelty_distance_decay': 0.5,
+            'prob_alteration_dict': {
+                "alter_start_pos": 0,
+                "alter_goal_pos": 0,
+                "wall": 0.5,
+                "lava": 0.5,
+                "sand": 0.0,
+            },
         },
 
         # cgp parameterisation
-        'max_time':  100,  # 82800s~23h
-        'genome_params': {"n_inputs": 2, },
+        'max_time':  79200,  # 82800s~23h
+        'genome_params': {"n_inputs": 4, },
         'ea_params': {'n_processes': 4, },
-        'use_rxet_init': True,
+        #'use_rxet_init': True,
 
     }
 
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'n_hidden_scan_with_no_backprop'
+    results_folder = 'seed_scan_large_hidden_no_backprop'
 
-    n_hidden_array = [300, 400, 500, 1000]
+    initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870,
+                          1234567880, 1234567890]
 
-    for n_hidden in n_hidden_array:
+    for use_rxet_init in [True, False]:
 
-        params['network_params']['n_hidden'] = n_hidden
-        key = dicthash.generate_hash_from_dict(params)
+        params['use_rxet_init'] = use_rxet_init
 
-        params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
-        params['workingdir'] = os.getcwd()
+        for initial_seed in initial_seed_array:
 
-        submit_job = True
+            params['env_params']['seeds'] = np.linspace(initial_seed, initial_seed+3, 4)
 
-        print('preparing job')
-        print(' ', params['outputdir'])
+            key = dicthash.generate_hash_from_dict(params)
 
-        utils.mkdirp(params['outputdir'])
-        utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
-        utils.create_jobfile(params)
-        utils.copy_file(params['sim_script'], params['outputdir'])
-        utils.copy_files(params['dependencies'], params['outputdir'])
-        if submit_job:
-            print('submitting job')
-            utils.submit_job(params)
+            params['outputdir'] = os.path.join(os.getcwd(), results_folder, key)
+            params['workingdir'] = os.getcwd()
+
+            submit_job = True
+
+            print('preparing job')
+            print(' ', params['outputdir'])
+
+            utils.mkdirp(params['outputdir'])
+            utils.write_pickle(params, os.path.join(params['outputdir'], 'params.pickle'))
+            utils.create_jobfile(params)
+            utils.copy_file(params['sim_script'], params['outputdir'])
+            utils.copy_files(params['dependencies'], params['outputdir'])
+            if submit_job:
+                print('submitting job')
+                utils.submit_job(params)
