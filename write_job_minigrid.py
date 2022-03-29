@@ -58,7 +58,7 @@ if __name__ == '__main__':
         },
 
         # cgp parameterisation
-        'max_time':  79200,  # 82800s~23h
+        'max_time':  30000,  # 82800s~23h
         'genome_params': {"n_inputs": 4, },
         'ea_params': {'n_processes': 4, },
         #'use_rxet_init': True,
