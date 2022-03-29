@@ -58,7 +58,7 @@ if __name__ == '__main__':
         },
 
         # cgp parameterisation
-        'max_time':  30000,  # 82800s~23h
+        'max_time':  3000,  # 82800s~23h
         'genome_params': {"n_inputs": 4, },
         'ea_params': {'n_processes': 4, },
         #'use_rxet_init': True,
@@ -70,8 +70,7 @@ if __name__ == '__main__':
 
     results_folder = 'seed_scan_large_hidden_no_backprop'
 
-    initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870,
-                          1234567880, 1234567890]
+    initial_seed_array = [1234567810]#, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
 
     for use_rxet_init in [True, False]:
 
