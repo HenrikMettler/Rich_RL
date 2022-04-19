@@ -5,7 +5,6 @@ from network import Network
 from typing import AnyStr, List
 
 
-# todo: ask J: is **_ a good solution to ignore seeds?
 def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict, spatial_novelty_distance_decay,
                    n_episodes_per_alteration, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng, **_):
 
@@ -83,43 +82,6 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
         state = new_state[:,:,0].flatten()
     return np.sum(rewards)
-
-
-# def update_inp_hidden_weights_offline(net, rewards, log_probs, normalize_discounted_rewards_b=False ):
-#
-#     discounted_rewards = calculate_discounted_rewards(rewards)
-#
-#     if normalize_discounted_rewards_b:
-#         discounted_rewards = normalize_discounted_rewards(discounted_rewards)
-#
-#     policy_gradient_list = calculate_policy_gradient_element_wise(
-#         log_probs=log_probs, discounted_rewards=discounted_rewards)
-#
-#     torch.autograd.set_detect_anomaly(True)
-#     net.optimizer.zero_grad()
-#     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-#     policy_gradient.backward(retain_graph=True)
-#     net.optimizer.step()
-
-
-# def update_output_weights_online_with_rule(rule, net, reward, el_traces, temporal_novelty, spatial_novelty):
-#
-#     # expand scalar values in dimensionality of hidden_layer (incl bias)
-#     n = net.output_layer.in_features + 1
-#     reward_expanded = reward*torch.ones(n)
-#     temporal_novelty_expanded = temporal_novelty*torch.ones(n)
-#     spatial_novelty_expanded = spatial_novelty*torch.ones(n)
-#
-#     with torch.no_grad():
-#         lr = net.learning_rate_hid2out
-#         for idx_action, (weight_vector, bias) in enumerate(zip(net.output_layer.weight, net.output_layer.bias)):
-#             updates = rule(torch.stack([reward_expanded, el_traces[idx_action,:],
-#                                         temporal_novelty_expanded, spatial_novelty_expanded], 1))
-#
-#             weight_update = updates[:-1].squeeze()
-#             bias_update = updates[-1].squeeze()
-#             weight_vector -= lr * weight_update
-#             bias -= lr * bias_update
 
 
 def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
@@ -284,7 +246,7 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     hidden_activities_t = torch.stack(hidden_activities)
     updates_vector = torch.matmul(left_term, hidden_activities_t)
 
-    return -updates_vector, ##-bias_updates
+    return -updates_vector
 
 
 def update_output_layer_with_equation4(network: Network, rewards: List[float],
@@ -366,31 +328,6 @@ def update_weights_online_with_policy_gradient(network, reward,  el_traces, log_
 
 def compute_weight_bias_update_online(reward, el_traces_per_output):
     return -reward*el_traces_per_output
-
-
-# def update_weights_online_with_rule(rule, network, reward,  el_traces, log_prob, discounted_reward,
-#                                     done, expected_cum_reward_per_episode):
-#     policy_gradient = -log_prob * discounted_reward
-#
-#     network.optimizer.zero_grad()
-#     policy_gradient.backward()
-#     network.optimizer.step()
-#
-#     # update_output weights
-#     with torch.no_grad():
-#         lr = network.learning_rate_hid2out
-#         rewards_torch_expanded = reward * torch.ones(network.output_layer.weight.size(1)+1) # +1 for bias
-#         done_torch_expanded = done * torch.ones_like(rewards_torch_expanded)
-#         expected_cum_reward_per_episode_torch_expanded = expected_cum_reward_per_episode * torch.ones_like(
-#             rewards_torch_expanded)
-#
-#         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-#             updates = rule(torch.stack([rewards_torch_expanded, el_traces[idx_action,:],
-#                                         done_torch_expanded, expected_cum_reward_per_episode_torch_expanded],1)).squeeze()
-#             weight_update = updates[:-1]
-#             bias_update = updates[-1]
-#             weight_vector += lr * weight_update
-#             bias += lr * bias_update
 
 
 def play_some_episodes_with_trained_agent(data, params):

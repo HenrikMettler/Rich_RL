@@ -78,7 +78,6 @@ class Network(nn.Module):
                                                                                torch.Tensor, torch.Tensor]:
         state = torch.from_numpy(state).float().unsqueeze(0)
         hidden_activities, probs = self.forward(state)
-        # Todo: use torch generator instead of numpy rng
         try:
             selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
         except ValueError:

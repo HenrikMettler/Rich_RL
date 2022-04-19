@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     results_folder = 'seed_scan_large_hidden_no_backprop'
 
-    initial_seed_array = [1234567810]#, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
+    initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
 
     for use_rxet_init in [True, False]:
 

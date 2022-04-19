@@ -46,6 +46,7 @@ def inner_objective(
 
     seeds = env_params["seeds"]
 
+    reward_per_seed = []
     reward_per_seed_mean = []
     for seed in seeds:
         seed = int(seed)
@@ -62,8 +63,10 @@ def inner_objective(
 
         rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **env_params, rng=rng)
 
+        reward_per_seed.append(rewards_over_alterations)
         reward_per_seed_mean.append(np.mean(rewards_over_alterations))
 
+    ind.reward_matrix = reward_per_seed
     reward_mean = np.mean(reward_per_seed_mean)
 
     return float(reward_mean)
@@ -120,15 +123,17 @@ if __name__ == "__main__":
     else:
         pop = cgp.Population(genome_params=genome_params)
 
-    # Todo: add history["evaluation fitness"]
     history = {}
     history["fitness_champion"] = []
     history["expression_champion"] = []
+    history["reward_matrix"] = []
+
     champion_history = []   # not in history, since individuals can't be pickled
 
     def recording_callback(pop):
         history["fitness_champion"].append(pop.champion.fitness)
         history["expression_champion"].append(str(pop.champion.to_sympy()))
+        history["reward_matrix"].append(pop.champion.reward_matrix)
         champion_history.append(pop.champion.copy())
 
     obj = functools.partial(objective, network_params=network_params, env_params=env_params)
@@ -141,7 +146,6 @@ if __name__ == "__main__":
     history['validated_champion_expression'] = []
 
     for champion in champion_history:
-        # todo evaluate rule on one curriculum with new seed
         history['validated_champion_expression'].append(str(champion.to_sympy()))
         seed = int(env_params['seeds'][-1] +100)
         reward = calculate_validation_fitness(champion, seed, network_params, env_params)
@@ -155,5 +159,5 @@ if __name__ == "__main__":
 
     # store history
     filename = 'history.pickle'
-    file = open(filename, 'wb')
-    pickle.dump(history, file)
+    with open(filename, 'wb') as f:
+        pickle.dump(history, f)
