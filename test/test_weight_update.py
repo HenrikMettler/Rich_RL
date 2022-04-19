@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pytest
 import sys
-import ipdb
+#import ipdb
 
 sys.path.insert(0, '../')
 from network import Network
@@ -44,8 +44,8 @@ def test_comparison_torch_eq2(seed, network_params, states, rewards):
             weight_updates[idx_action] = updates[0][:-1]
             bias_updates[idx_action] = updates[0][-1]
 
-    update_weights(network=net, rewards=rewards, log_probs=log_probs,
-                       actions=actions,probs=probs, hidden_activities=hidden_activities_all)
+    update_weights(network=net, rewards=rewards, log_probs=log_probs, probs=probs, actions=actions,
+                   hidden_activities=hidden_activities_all)
 
     assert weight_updates.numpy() != pytest.approx(0.)
     assert bias_updates.numpy() != pytest.approx(0.)
@@ -84,7 +84,7 @@ def test_comparison_torch_eq4(seed, network_params, states, rewards):
         for idx_action in range(network_params["n_outputs"]):
             weight_updates[idx_action], bias_updates[idx_action] = compute_weight_bias_updates_equation4(rewards, el_traces[idx_action])
 
-    update_weights(network=net, rewards=rewards, log_probs=log_probs, actions=actions, probs=probs,
+    update_weights(network=net, rewards=rewards, log_probs=log_probs, probs=probs, actions=actions,
                    hidden_activities=hidden_activities_all, normalize_discounted_rewards_b=False)
 
     assert weight_updates.numpy() != pytest.approx(0.)
@@ -128,7 +128,7 @@ def test_update_weights_online(seed, network_params, states, rewards, gamma):
          "hidden_activities": [hidden_activities],
      }
 
-    update_weights(net, **update_params, normalize_discounted_rewards_b=False)
+    update_weights(net, normalize_discounted_rewards_b=False, **update_params)
 
     assert net.output_layer.weight._grad.detach().numpy() == pytest.approx(weight_updates.numpy())
     assert net.output_layer.bias._grad.detach().numpy() == pytest.approx(bias_updates.numpy())
@@ -164,7 +164,7 @@ def test_update_weights_online(seed, network_params, states, rewards, gamma):
                 weight_updates[idx_action] += updates[:-1]
                 bias_updates[idx_action] += updates[-1]
 
-    update_weights(network=net, rewards=rewards, log_probs=log_probs, actions=actions, probs=probs,
+    update_weights(network=net, rewards=rewards, log_probs=log_probs, probs=probs, actions=actions,
                    hidden_activities=hidden_activities_all, normalize_discounted_rewards_b=False)
 
 

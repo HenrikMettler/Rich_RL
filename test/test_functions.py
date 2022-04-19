@@ -4,8 +4,13 @@ import pytest
 import sys
 
 sys.path.insert(0, '../')
-from functions import normalize_discounted_rewards, calculate_discounted_rewards, \
-    calculate_policy_gradient_element_wise
+from functions import play_episode, normalize_discounted_rewards, calculate_discounted_rewards, \
+    calculate_policy_gradient_element_wise, update_weights_offline, update_output_layer_with_evolved_rule_offline, \
+    compute_weight_bias_updates_with_rule_offline, calc_el_traces
+
+
+def test_play_episode():
+    raise NotImplementedError
 
 
 def test_calculate_discounted_rewards(gamma):
@@ -53,5 +58,17 @@ def test_comp_policy_gradient_elwise_vectorwise(gamma):
     assert policy_gradient_from_elwise.numpy() == pytest.approx(policy_gradient_vectorwise.numpy())
 
 
-#def test_calc_el_traces():
-#    raise NotImplementedError
+def test_update_weights_offline():
+    raise NotImplementedError
+
+
+def test_update_output_layer_with_evolved_rule_offline():
+    raise NotImplementedError
+
+
+def test_compute_weight_bias_updates_with_rule_offline():
+    raise NotImplementedError
+
+
+def test_calc_el_traces():
+    raise NotImplementedError
