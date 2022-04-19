@@ -56,11 +56,11 @@ if __name__ == '__main__':
             },
         },
         # seed parameters
-        'seeds': np.linspace(1234567890, 1234567899, 4),
+        # 'seeds': np.linspace(1234567890, 1234567899, 4),
 
         # cgp parameterisation
-        'max_time':  3000,  # 82800s~23h
-        'genome_params': {"n_inputs": 4, },
+        'max_time':  40000,  # 82800s~23h
+        'genome_params': {"n_inputs": 5, },
         'ea_params': {'n_processes': 4, },
         #'use_rxet_init': True,
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'seed_scan_large_hidden_no_backprop'
+    results_folder = 'seed_scan_large_hidden_no_backprop_and_weight_input'
 
     initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
 

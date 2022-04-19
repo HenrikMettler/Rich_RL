@@ -183,9 +183,12 @@ def update_output_layer_with_evolved_rule_offline(rule, network, rewards, el_tra
             temporal_novelty_expanded = None
 
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-
+            bias_copy = bias.detach().clone()   # # todo: ugly hack, make nicer
+            bias_copy.resize_(1)
+            weight_bias_vector = torch.cat((weight_vector, bias_copy))
             weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
-                (rewards_expanded, el_traces[idx_action], rule, temporal_novelty_expanded, spatial_novelty_expanded)
+                (rewards_expanded, el_traces[idx_action], rule, temporal_novelty_expanded, spatial_novelty_expanded,
+                 weight_bias_vector)
             weight_vector += lr* weight_updates
             bias += lr*bias_updates
 
@@ -199,7 +202,8 @@ def _expand_signal_in_hidden_layer_dim(signal, hidden_layer_dim):
     return signal_torch_expanded
 
 
-def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None, spatial_novelty=None):
+def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None, spatial_novelty=None,
+                                                  weight_bias_vector=None):
     weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
     bias_updates = torch.zeros(1).squeeze()
 
@@ -212,7 +216,7 @@ def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temp
             updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], spatial_novelty[:, idx_time]],1))
         else:
             updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time],
-                                        spatial_novelty[:, idx_time]],1))
+                                        spatial_novelty[:, idx_time], weight_bias_vector],1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates
