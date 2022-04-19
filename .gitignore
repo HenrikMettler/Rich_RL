@@ -7,3 +7,5 @@
 *.pkl
 *.pickle
 *data/
+*.idea/
+*.DS_Store
