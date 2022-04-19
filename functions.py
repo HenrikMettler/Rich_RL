@@ -6,7 +6,7 @@ from typing import AnyStr, List
 
 
 def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict, spatial_novelty_distance_decay,
-                   n_episodes_per_alteration, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng, **_):
+                   n_episodes_per_alteration, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng):
 
     rewards_over_alterations: List[float] = []
 

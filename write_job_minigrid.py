@@ -38,12 +38,11 @@ if __name__ == '__main__':
             'beta': 1.0
         },
 
-        # environment parameterization:
-        'env_params': {
+        # curriculum parameterization:
+        'curriculum_params': {
             'max_n_alterations': 4,
             'n_alterations_per_new_env': 3,
             'n_episodes_per_alteration': 2000,
-            #'seeds': np.linspace(1234567890, 1234567899, 4),
             'n_steps_max': 100,
             'temporal_novelty_decay': 0.99,
             'spatial_novelty_time_decay': 0.99,
@@ -56,6 +55,8 @@ if __name__ == '__main__':
                 "sand": 0.0,
             },
         },
+        # seed parameters
+        'seeds': np.linspace(1234567890, 1234567899, 4),
 
         # cgp parameterisation
         'max_time':  3000,  # 82800s~23h
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 
         for initial_seed in initial_seed_array:
 
-            params['env_params']['seeds'] = np.linspace(initial_seed, initial_seed+3, 4)
+            params['seeds'] = np.linspace(initial_seed, initial_seed+3, 4)
 
             key = dicthash.generate_hash_from_dict(params)
 

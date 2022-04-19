@@ -21,13 +21,14 @@ from operators import Const05Node, Const2Node
 def objective(
         individual: cgp.IndividualSingleGenome,
         network_params: dict,
-        env_params: dict,
+        curriculum_params: dict,
+        seeds
 ):
 
     if not individual.fitness_is_None():
         return individual
     try:
-        individual.fitness = inner_objective(individual, network_params, env_params)
+        individual.fitness = inner_objective(individual, network_params, curriculum_params, seeds)
     except ZeroDivisionError:
         individual.fitness = -np.inf
     return individual
@@ -39,12 +40,13 @@ def objective(
 def inner_objective(
     ind: cgp.IndividualSingleGenome,
     network_params: dict,
-    env_params: dict,
+    curriculum_params: dict,
+    seeds
 ) -> float:
 
     rule = ind.to_torch()
 
-    seeds = env_params["seeds"]
+    #seeds = env_params["seeds"]
 
     reward_per_seed = []
     reward_per_seed_mean = []
@@ -61,7 +63,7 @@ def inner_objective(
 
         policy_net = Network(n_inputs=np.size(state), **network_params)
 
-        rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **env_params, rng=rng)
+        rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **curriculum_params, rng=rng)
 
         reward_per_seed.append(rewards_over_alterations)
         reward_per_seed_mean.append(np.mean(rewards_over_alterations))
@@ -72,7 +74,7 @@ def inner_objective(
     return float(reward_mean)
 
 
-def calculate_validation_fitness(champion, seed, network_params, env_params):
+def calculate_validation_fitness(champion, seed, network_params, curriculum_params):
 
     rule = champion.to_torch()
 
@@ -86,7 +88,7 @@ def calculate_validation_fitness(champion, seed, network_params, env_params):
 
     policy_net = Network(n_inputs=np.size(state), **network_params)
 
-    rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **env_params, rng=rng)
+    rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **curriculum_params, rng=rng)
 
     return np.mean(rewards_over_alterations)
 
@@ -110,8 +112,9 @@ if __name__ == "__main__":
 
     # parse params
     network_params = params['network_params']
-    env_params = params['env_params']
+    curriculum_params = params['curriculum_params']
     max_time = params['max_time']
+    seeds = params["seeds"]
     genome_params = params['genome_params']  # {"n_inputs": 2}
     ea_params = params['ea_params']  # {'n_processes':4,}
 
@@ -136,7 +139,8 @@ if __name__ == "__main__":
         history["reward_matrix"].append(pop.champion.reward_matrix)
         champion_history.append(pop.champion.copy())
 
-    obj = functools.partial(objective, network_params=network_params, env_params=env_params)
+    obj = functools.partial(objective, network_params=network_params, curriculum_params=curriculum_params,
+                            seeds=seeds)
 
     start = time.time()
     cgp.evolve(obj,  max_time=max_time, ea=ea, pop=pop, print_progress=True, callback=recording_callback)
@@ -147,8 +151,8 @@ if __name__ == "__main__":
 
     for champion in champion_history:
         history['validated_champion_expression'].append(str(champion.to_sympy()))
-        seed = int(env_params['seeds'][-1] +100)
-        reward = calculate_validation_fitness(champion, seed, network_params, env_params)
+        seed = int(seeds[-1] +100)
+        reward = calculate_validation_fitness(champion, seed, network_params, curriculum_params)
         history['validation_fitness'].append(reward)
     print(f"Time elapsed:", end - start)
 
