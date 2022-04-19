@@ -1,0 +1,9 @@
+*~
+*.orig
+*.egg-info/
+*.cache/
+*__pycache__/
+*venv
+*.pkl
+*.pickle
+*data/
