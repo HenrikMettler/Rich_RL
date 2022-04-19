@@ -92,8 +92,8 @@ if __name__ == "__main__":
                             "actions": actions,
                             "hidden_activities": hidden_activities_all,
                         }
-                        update_weights(network=policy_net, **update_params,
-                                       weight_update_mode=weight_update_mode, normalize_discounted_rewards_b=False)
+                        update_weights(network=policy_net, weight_update_mode=weight_update_mode,
+                                       normalize_discounted_rewards_b=False, **update_params)
 
                         n_steps_per_episode.append(steps)
                         break
