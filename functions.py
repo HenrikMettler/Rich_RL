@@ -208,9 +208,9 @@ def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
     return eligibility
 
 
-def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewards: torch.Tensor,
-                                                  eligibility_over_time: torch.Tensor, temporal_novelty: float,
-                                                  spatial_novelty: list[int]):
+def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewards,
+                                                  eligibility_over_time, temporal_novelty,
+                                                  spatial_novelty):
 
     """ Dimensions:
         discounted rewards: T
