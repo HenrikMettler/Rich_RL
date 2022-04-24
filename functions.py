@@ -44,7 +44,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
     log_probs: List[torch.Tensor] = []
     probs: List[float] = []
     actions: List[int] = []
-    hidden_activities_all = []
+    hidden_activities_over_time = []
     rewards: List[float] = []
     spatial_novelty_signals = []
 
@@ -60,7 +60,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
         probs.append(prob)
         actions.append(action)
         rewards.append(reward)
-        hidden_activities_all.append(hidden_activities)
+        hidden_activities_over_time.append(hidden_activities)
         spatial_novelty_currently = env.spatial_novelty_grid[env.agent_pos[0], env.agent_pos[1]]
         spatial_novelty_signals.append(spatial_novelty_currently)
 
@@ -70,7 +70,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
                 "probs": probs,
                 "log_probs": log_probs,
                 "actions": actions,
-                "hidden_activities": hidden_activities_all,
+                "hidden_activities": hidden_activities_over_time,
                 'temporal_novelty': temporal_novelty,
                 'spatial_novelty': spatial_novelty_signals
             }
