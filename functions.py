@@ -84,13 +84,16 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
     return np.sum(rewards)
 
 
-def calculate_discounted_rewards(rewards: List[float], gamma=0.9):
+def calculate_discounted_rewards(rewards: List[float], gamma=0.9, normalize_discounted_rewards_b=True):
     rewards = torch.Tensor(rewards)
     n = len(rewards)
     discounted_rewards = torch.empty(n)
     for t in range(n):
         gamma_factor = gamma**torch.arange(n-t, dtype=torch.float)
         discounted_rewards[t] = gamma_factor @ rewards[t:]
+    if normalize_discounted_rewards_b:
+        # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
     return discounted_rewards
 
 
@@ -111,20 +114,20 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
 
 
 def update_weights_offline(network: Network, rewards, log_probs, probs, actions, hidden_activities,
-                   temporal_novelty=None,
-                   spatial_novelty=None,
-                   weight_update_mode: AnyStr = 'autograd',
-                   normalize_discounted_rewards_b = True,
-                   rule = None):
+                           temporal_novelty=None, spatial_novelty=None, weight_update_mode: AnyStr = 'autograd',
+                           normalize_discounted_rewards_b=True, rule=None):
 
+    discounted_rewards = calculate_discounted_rewards(rewards, normalize_discounted_rewards_b)
 
-    discounted_rewards = calculate_discounted_rewards(rewards)
-    # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
-    if normalize_discounted_rewards_b:
-        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+    # inp 2 hidden updates with PG - only done if lr is not 0
+    if network.learning_rate_inp2hid != 0.0:
+        policy_gradient_list = calculate_policy_gradient_element_wise(
+            log_probs=log_probs, discounted_rewards=discounted_rewards)
 
-    policy_gradient_list = calculate_policy_gradient_element_wise(
-        log_probs=log_probs, discounted_rewards=discounted_rewards)
+        network.optimizer.zero_grad()
+        policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+        policy_gradient.backward()  # this doesn't update the hidden to output weights, since they have require_grad=False
+        network.optimizer.step()
 
     network.optimizer.zero_grad()
     policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
