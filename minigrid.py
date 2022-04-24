@@ -121,7 +121,7 @@ if __name__ == "__main__":
     # initialize EA and Population
     ea = cgp.ea.MuPlusLambda(**ea_params)
 
-    if params['use_rxet_init']:
+    if params['use_drxeot_init']:
         pop = cgp.Population(genome_params=genome_params, individual_init=set_initial_dna)
     else:
         pop = cgp.Population(genome_params=genome_params)

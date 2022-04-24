@@ -69,13 +69,13 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'seed_scan_large_hidden_no_backprop_and_weight_input'
+    results_folder = 'dr_el_over_time_seed_scan'
 
     initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
 
-    for use_rxet_init in [True, False]:
+    for use_drxeot_init in [True, False]:
 
-        params['use_rxet_init'] = use_rxet_init
+        params['use_drxeot_init'] = use_drxeot_init
 
         for initial_seed in initial_seed_array:
 
