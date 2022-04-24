@@ -129,12 +129,20 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
         policy_gradient.backward()  # this doesn't update the hidden to output weights, since they have require_grad=False
         network.optimizer.step()
 
-    network.optimizer.zero_grad()
-    policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
-    policy_gradient.backward()  # this doesn't update the hidden to output weights, since they have require_grad=False
-    network.optimizer.step()
+    if weight_update_mode == 'evolved-rule':
+        if rule is None:
+            raise ValueError('rule must be defined for update with rule')
 
-    if weight_update_mode == 'equation2':
+        # test with: row sums = 0,  ++
+        sampled_action_minus_action_prob_over_time = calculate_sampled_actions_minus_probs_time_array(actions, probs)
+        eligibility_over_time = calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time,
+                                                                hidden_activities)
+
+        update_output_layer_with_evolved_rule_offline(rule=rule, network=network, discounted_rewards=discounted_rewards,
+                                                      eligibility_over_time=eligibility_over_time, temporal_novelty=
+                                                      temporal_novelty, spatial_novelty=spatial_novelty)
+
+    elif weight_update_mode == 'equation2':
         eq2_params = {
             "discounted_rewards": discounted_rewards,
             "probs": probs,
@@ -151,75 +159,114 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
         }
         update_output_layer_with_equation4(network, rewards, el_params)
 
-    elif weight_update_mode == 'evolved-rule':
-        if rule == None:
-            raise ValueError('rule must be defined for update with rule')
-        el_params = {
-            "probs": probs,
-            "hidden_activities": hidden_activities,
-            "actions": actions,
-        }
-        el_traces = calc_el_traces(**el_params)
-        update_output_layer_with_evolved_rule_offline(rule=rule, network=network, rewards=rewards, el_traces=el_traces,
-                                                      temporal_novelty=temporal_novelty, spatial_novelty=spatial_novelty)
-
     elif weight_update_mode == 'autograd':
         pass  # update done above
     else:
         raise NotImplementedError
 
 
-def update_output_layer_with_evolved_rule_offline(rule, network, rewards, el_traces, temporal_novelty, spatial_novelty):
-    # update output weights
+def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: List[torch.Tensor]):
+    assert len(actions) == len(probs)
+    sampled_action_minus_action_prob_over_time = torch.zeros((len(probs), probs[0].shape[1]), requires_grad=False)
+    for time_idx, sampled_action in enumerate(actions):
+        sampled_action_minus_action_prob = calculate_sampled_action_minus_prob(sampled_action, probs[time_idx])
+        sampled_action_minus_action_prob_over_time[time_idx] = sampled_action_minus_action_prob
+    return sampled_action_minus_action_prob_over_time
+
+
+def calculate_sampled_action_minus_prob(action, probs):
+    kroenecker = torch.zeros(probs.shape, requires_grad=False)
+    kroenecker[0, action] = 1
+    parenthesis = kroenecker - probs
+    return parenthesis
+
+
+def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, hidden_activities_over_time):
+
+    assert len(sampled_action_minus_action_prob_over_time) == len(hidden_activities_over_time)
+
+    time_dim = len(hidden_activities_over_time)
+    n_hidden_with_bias = hidden_activities_over_time[0].shape[0]
+    n_actions = sampled_action_minus_action_prob_over_time.shape[1]
+    eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias), requires_grad=False)
+
+    for idx_time in range(time_dim):
+        eligibility = calculate_eligibility(sampled_action_minus_action_prob_over_time[idx_time],
+                                            hidden_activities_over_time[idx_time])
+        eligibility_over_time[idx_time] = eligibility
+    return eligibility_over_time
+
+
+def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
+    # resizing of detached clones for mat mult
+    samp_act_clone = sampled_action_minus_action_prob.detach().clone()
+    samp_act_clone.resize_((len(samp_act_clone),1))
+    hid_act = hidden_activities.detach().clone()
+    hid_act.resize_((1, len(hid_act)))
+
+    eligibility = samp_act_clone * hid_act
+    return eligibility
+
+
+def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewards: torch.Tensor,
+                                                  eligibility_over_time: torch.Tensor, temporal_novelty: float,
+                                                  spatial_novelty: list[int]):
+
+    """ Dimensions:
+        discounted rewards: T
+        eligibility_over_time: T * N_ACT * N_Hidden(+1)
+        spatial_novelty: T
+        temporal_novelty: 1
+    """
+
     with torch.no_grad():
         lr = network.learning_rate_hid2out
-        rewards_expanded = _expand_signal_in_hidden_layer_dim(signal=rewards,
-                                                              hidden_layer_dim=network.output_layer.weight.size(1) + 1)
-        if spatial_novelty is not None:
-            spatial_novelty_expanded = _expand_signal_in_hidden_layer_dim(signal=spatial_novelty,
-                                                        hidden_layer_dim=network.output_layer.weight.size(1) + 1)
-        else:
-            spatial_novelty_expanded = None
-        if temporal_novelty is not None:
-            temporal_novelty_expanded = temporal_novelty * torch.ones([network.output_layer.weight.size(1) + 1, len(rewards)])
-        else:
-            temporal_novelty_expanded = None
 
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
-            bias_copy = bias.detach().clone()   # # todo: ugly hack, make nicer
-            bias_copy.resize_(1)
-            weight_bias_vector = torch.cat((weight_vector, bias_copy))
-            weight_updates, bias_updates = compute_weight_bias_updates_with_rule_offline\
-                (rewards_expanded, el_traces[idx_action], rule, temporal_novelty_expanded, spatial_novelty_expanded,
-                 weight_bias_vector)
+            weight_bias_vector = concat_weight_bias(weight_vector, bias)
+            eligibility_over_time_current_output_unit = eligibility_over_time[:, idx_action, :]
+            weight_updates, bias_updates = \
+                compute_updates_per_output_unit_with_rule_offline (rule, discounted_rewards,
+                                                                   eligibility_over_time_current_output_unit,
+                                                                   temporal_novelty, spatial_novelty,
+                                                                   weight_bias_vector)
             weight_vector += lr* weight_updates
             bias += lr*bias_updates
 
 
+def concat_weight_bias(weight_vector, bias):
+    bias_copy = bias.detach().clone()
+    bias_copy.resize_(1)
+    weight_bias_vector = torch.cat((weight_vector, bias_copy))
+    return weight_bias_vector
+
+
 def _expand_signal_in_hidden_layer_dim(signal, hidden_layer_dim):
     ones = torch.ones(hidden_layer_dim)
-    ones = ones.resize_((len(ones), 1))
-    signal_t = torch.tensor(signal)
-    signal_t.resize_(1, len(signal))
-    signal_torch_expanded = ones * signal_t
+    ones = ones.resize_(1,(len(ones)))
+    signal.resize_(len(signal),1)
+    signal_torch_expanded = signal*ones
     return signal_torch_expanded
 
 
-def compute_weight_bias_updates_with_rule_offline(rewards, el_traces, rule, temporal_novelty=None, spatial_novelty=None,
-                                                  weight_bias_vector=None):
-    weight_updates = torch.zeros(len(el_traces[:, 0]) - 1)
+def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, eligibility_over_time,
+                                                      temporal_novelty=None, spatial_novelty=None,
+                                                      weight_bias_vector=None):
+
+    weight_updates = torch.zeros(len(weight_bias_vector)-1)
     bias_updates = torch.zeros(1).squeeze()
 
-    for idx_time in range(rewards.shape[1]):
-        if temporal_novelty is None and spatial_novelty is None:
-            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time]],1))
-        elif spatial_novelty is None:
-            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time]],1))
-        elif temporal_novelty is None:
-            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], spatial_novelty[:, idx_time]],1))
-        else:
-            updates = rule(torch.stack([rewards[:,idx_time], el_traces[:, idx_time], temporal_novelty[:, idx_time],
-                                        spatial_novelty[:, idx_time], weight_bias_vector],1))
+    # expand signals which don't have hidden dimensionality
+    hidd_dim = len(weight_updates)+1
+    discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
+    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
+    temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
+
+    for idx_time in range(len(discounted_rewards)):
+        # todo: 1) adapt to rule with variable output number
+        # todo: 2) is the for loop necessary, ie can ind.to_torch() modules be stacked in 3 dim?
+        updates = rule(torch.stack([discounted_rewards_exp[idx_time, :], eligibility_over_time[idx_time, :],
+                                    temporal_novelty_exp, spatial_novelty_exp[idx_time, :], weight_bias_vector],1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates
