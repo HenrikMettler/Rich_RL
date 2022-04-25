@@ -91,18 +91,18 @@ def calculate_discounted_rewards(rewards: List[float], gamma=0.9, normalize_disc
     for t in range(n):
         gamma_factor = gamma**torch.arange(n-t, dtype=torch.float)
         discounted_rewards[t] = gamma_factor @ rewards[t:]
+
+    def _normalize_discounted_rewards(discounted_rewards: torch.Tensor):
+        if len(discounted_rewards) == 0:
+            raise RuntimeError("Length of discounted rewards must be non-zero")
+        elif len(discounted_rewards) == 1:
+            return torch.Tensor([0.])
+        return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
+
     if normalize_discounted_rewards_b:
         # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
-        discounted_rewards = normalize_discounted_rewards(discounted_rewards)
+        discounted_rewards = _normalize_discounted_rewards(discounted_rewards)
     return discounted_rewards
-
-
-def normalize_discounted_rewards(discounted_rewards: torch.Tensor):
-    if len(discounted_rewards) == 0:
-        raise RuntimeError("Length of discounted rewards must be non-zero")
-    elif len(discounted_rewards) == 1:
-        return torch.Tensor([0.])
-    return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
 
 
 def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discounted_rewards: torch.Tensor):
