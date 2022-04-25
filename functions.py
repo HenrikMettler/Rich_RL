@@ -5,8 +5,14 @@ from network import Network
 from typing import AnyStr, List
 
 
-def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict, spatial_novelty_distance_decay,
-                   n_episodes_per_alteration, n_steps_max, temporal_novelty_decay, spatial_novelty_time_decay, rng):
+def rule_wrapper(rule, discounted_rewards, eligibility_over_time,
+                 temporal_novelty=None, spatial_novelty=None, weights=None):
+    raise NotImplementedError
+
+
+def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict,
+                   spatial_novelty_distance_decay, n_episodes_per_alteration, n_steps_max, temporal_novelty_decay,
+                   spatial_novelty_time_decay, rng):
 
     rewards_over_alterations: List[float] = []
 
@@ -40,7 +46,7 @@ def play_episodes(env, net, rule, n_episodes, n_steps_max, temporal_novelty_deca
 
 def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
 
-    state = env.respawn()["image"][:,:,0].flatten()
+    state = env.respawn()["image"][:, :, 0].flatten()
     log_probs: List[torch.Tensor] = []
     probs: List[float] = []
     actions: List[int] = []
@@ -74,13 +80,12 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
                 'temporal_novelty': temporal_novelty,
                 'spatial_novelty': spatial_novelty_signals
             }
-            update_weights_offline(network=net, weight_update_mode='evolved-rule',
-                                    normalize_discounted_rewards_b=False,
-                                    rule=rule, **update_params)
+            update_weights_offline(network=net, weight_update_mode='evolved-rule', normalize_discounted_rewards_b=False,
+                                   rule=rule, **update_params)
 
             break
 
-        state = new_state[:,:,0].flatten()
+        state = new_state[:, :, 0].flatten()
     return np.sum(rewards)
 
 
@@ -115,14 +120,15 @@ def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discou
 
 def update_weights_offline(network: Network, rewards, log_probs, probs, actions, hidden_activities,
                            temporal_novelty=None, spatial_novelty=None, weight_update_mode: AnyStr = 'autograd',
-                           normalize_discounted_rewards_b=True, rule=None):
+                           normalize_discounted_rewards_b=False, rule=None):
 
-    discounted_rewards = calculate_discounted_rewards(rewards, normalize_discounted_rewards_b)
+    discounted_rewards = calculate_discounted_rewards(rewards,
+                                                      normalize_discounted_rewards_b=normalize_discounted_rewards_b)
 
     # inp 2 hidden updates with PG - only done if lr is not 0
     if network.learning_rate_inp2hid != 0.0:
-        policy_gradient_list = calculate_policy_gradient_element_wise(
-            log_probs=log_probs, discounted_rewards=discounted_rewards)
+        policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
+                                                                      discounted_rewards=discounted_rewards)
 
         network.optimizer.zero_grad()
         policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
@@ -168,17 +174,17 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: List[torch.Tensor]):
     assert len(actions) == len(probs)
     sampled_action_minus_action_prob_over_time = torch.zeros((len(probs), probs[0].shape[1]), requires_grad=False)
+
+    def calculate_sampled_action_minus_prob(action, probs):
+        kroenecker = torch.zeros(probs.shape, requires_grad=False)
+        kroenecker[0, action] = 1
+        parenthesis = kroenecker - probs
+        return parenthesis
+
     for time_idx, sampled_action in enumerate(actions):
         sampled_action_minus_action_prob = calculate_sampled_action_minus_prob(sampled_action, probs[time_idx])
         sampled_action_minus_action_prob_over_time[time_idx] = sampled_action_minus_action_prob
     return sampled_action_minus_action_prob_over_time
-
-
-def calculate_sampled_action_minus_prob(action, probs):
-    kroenecker = torch.zeros(probs.shape, requires_grad=False)
-    kroenecker[0, action] = 1
-    parenthesis = kroenecker - probs
-    return parenthesis
 
 
 def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, hidden_activities_over_time):
@@ -190,22 +196,20 @@ def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, 
     n_actions = sampled_action_minus_action_prob_over_time.shape[1]
     eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias), requires_grad=False)
 
+    def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
+        # resizing of detached clones for mat mult
+        samp_act_clone = sampled_action_minus_action_prob.detach().clone()
+        samp_act_clone.resize_((len(samp_act_clone), 1))
+        hid_act = hidden_activities.detach().clone()
+        hid_act.resize_((1, len(hid_act)))
+
+        return samp_act_clone * hid_act
+
     for idx_time in range(time_dim):
         eligibility = calculate_eligibility(sampled_action_minus_action_prob_over_time[idx_time],
                                             hidden_activities_over_time[idx_time])
         eligibility_over_time[idx_time] = eligibility
     return eligibility_over_time
-
-
-def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
-    # resizing of detached clones for mat mult
-    samp_act_clone = sampled_action_minus_action_prob.detach().clone()
-    samp_act_clone.resize_((len(samp_act_clone),1))
-    hid_act = hidden_activities.detach().clone()
-    hid_act.resize_((1, len(hid_act)))
-
-    eligibility = samp_act_clone * hid_act
-    return eligibility
 
 
 def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewards,
@@ -222,15 +226,15 @@ def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewa
     with torch.no_grad():
         lr = network.learning_rate_hid2out
 
+        # todo: can the updates be fully vectorized (tensorized?) over the 3 dim of out, hidden and time dimension?
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             weight_bias_vector = concat_weight_bias(weight_vector, bias)
             eligibility_over_time_current_output_unit = eligibility_over_time[:, idx_action, :]
             weight_updates, bias_updates = \
-                compute_updates_per_output_unit_with_rule_offline (rule, discounted_rewards,
-                                                                   eligibility_over_time_current_output_unit,
-                                                                   temporal_novelty, spatial_novelty,
-                                                                   weight_bias_vector)
-            weight_vector += lr* weight_updates
+                compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards,
+                                                                  eligibility_over_time_current_output_unit,
+                                                                  temporal_novelty, spatial_novelty, weight_bias_vector)
+            weight_vector += lr*weight_updates
             bias += lr*bias_updates
 
 
@@ -259,14 +263,24 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     # expand signals which don't have hidden dimensionality
     hidd_dim = len(weight_updates)+1
     discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
-    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
-    temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
+    if spatial_novelty is not None:
+        spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
+    else:
+        spatial_novelty_exp = None
+
+    if temporal_novelty is not None:
+        temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
+    else:
+        temporal_novelty_exp = None
+
+    # signals = signals = {"discounted_rewards": discounted_rewards_exp, "eligibility_over_time": eligibility_over_time,
+    #                      "temporal_novelty_exp": temporal_novelty_exp, "spatial_novelty_exp": spatial_novelty_exp,
+    #                     "weight_bias_vector": weight_bias_vector}
 
     for idx_time in range(len(discounted_rewards)):
-        # todo: 1) adapt to rule with variable output number
-        # todo: 2) is the for loop necessary, ie can ind.to_torch() modules be stacked in 3 dim?
+        # todo: adapt to rule with variable number of inputs
         updates = rule(torch.stack([discounted_rewards_exp[idx_time, :], eligibility_over_time[idx_time, :],
-                                    temporal_novelty_exp, spatial_novelty_exp[idx_time, :], weight_bias_vector],1))
+                                    temporal_novelty_exp, spatial_novelty_exp[idx_time, :], weight_bias_vector], 1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
     return weight_updates, bias_updates
@@ -275,7 +289,7 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
 def update_output_layer_with_equation2(network: Network, discounted_rewards: torch.Tensor, probs,
                                        actions, hidden_activities):
     """ manual update of output weights and biases"""
-    with torch.no_grad(): # to prevent interference with backward
+    with torch.no_grad():  # to prevent interference with backward
         lr = network.learning_rate_hid2out
         for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             updates = compute_weight_bias_updates_equation2(actions, idx_action,
@@ -303,8 +317,7 @@ def compute_weight_bias_updates_equation2(actions, idx_action, discounted_reward
     return -updates_vector
 
 
-def update_output_layer_with_equation4(network: Network, rewards: List[float],
-                                 el_params):
+def update_output_layer_with_equation4(network: Network, rewards: List[float], el_params):
 
     # update output weights
     with torch.no_grad():
