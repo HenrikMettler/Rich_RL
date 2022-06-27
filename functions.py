@@ -70,7 +70,6 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
         spatial_novelty_signals.append(spatial_novelty_currently)
 
         if done or steps == n_steps_max -1:
-            # todo: change data types List to tensors for update
             update_params = {
                 "rewards": torch.Tensor(rewards),
                 "probs": torch.stack(probs),
@@ -188,22 +187,12 @@ def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, 
     time_dim = len(hidden_activities_over_time)
     n_hidden_with_bias = hidden_activities_over_time.shape[1]
     n_actions = sampled_action_minus_action_prob_over_time.shape[1]
-    eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias), requires_grad=False)
+    eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias))
 
-    def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
-        # resizing of detached clones for mat mult
-        # todo: replace with: torch.outer(sampled_action_minus_action_prob_over_time[0], hidden_activities_over_time[0])
-        samp_act_clone = sampled_action_minus_action_prob.detach().clone()
-        samp_act_clone.resize_((len(samp_act_clone), 1))  # ((-1,1))
-        hid_act = hidden_activities.detach().clone()
-        hid_act.resize_((1, len(hid_act)))
-
-        return samp_act_clone * hid_act
-
+    # todo: vectorize this for loop
     for idx_time in range(time_dim):
-        eligibility = calculate_eligibility(sampled_action_minus_action_prob_over_time[idx_time],
+        eligibility_over_time[idx_time] = torch.outer(sampled_action_minus_action_prob_over_time[idx_time],
                                             hidden_activities_over_time[idx_time])
-        eligibility_over_time[idx_time] = eligibility
     return eligibility_over_time
 
 
