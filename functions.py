@@ -72,13 +72,13 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
         if done or steps == n_steps_max -1:
             # todo: change data types List to tensors for update
             update_params = {
-                "rewards": rewards,
-                "probs": probs,
-                "log_probs": log_probs,
+                "rewards": torch.Tensor(rewards),
+                "probs": torch.stack(probs),
+                "log_probs": torch.stack(log_probs),
                 "actions": actions,
-                "hidden_activities": hidden_activities_over_time,
+                "hidden_activities": torch.stack(hidden_activities_over_time),
                 'temporal_novelty': temporal_novelty,
-                'spatial_novelty': spatial_novelty_signals
+                'spatial_novelty': torch.Tensor(spatial_novelty_signals),
             }
             update_weights_offline(network=net, weight_update_mode='evolved-rule', normalize_discounted_rewards_b=False,
                                    rule=rule, **update_params)
@@ -89,36 +89,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
     return np.sum(rewards)
 
 
-def calculate_discounted_rewards(rewards: List[float], gamma=0.9, normalize_discounted_rewards_b=True):
-    rewards = torch.Tensor(rewards)
-    n = len(rewards)
-    discounted_rewards = torch.empty(n)
-    for t in range(n):
-        gamma_factor = gamma**torch.arange(n-t, dtype=torch.float)
-        discounted_rewards[t] = gamma_factor @ rewards[t:]
-
-    def _normalize_discounted_rewards(discounted_rewards: torch.Tensor):
-        if len(discounted_rewards) == 0:
-            raise RuntimeError("Length of discounted rewards must be non-zero")
-        elif len(discounted_rewards) == 1:
-            return torch.Tensor([0.])
-        return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
-
-    if normalize_discounted_rewards_b:
-        # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
-        discounted_rewards = _normalize_discounted_rewards(discounted_rewards)
-    return discounted_rewards
-
-
-def calculate_policy_gradient_element_wise(log_probs: List[torch.Tensor], discounted_rewards: torch.Tensor):
-    policy_gradient_list: List[torch.Tensor] = []
-    for log_prob, discounted_reward in zip(log_probs, discounted_rewards):
-        # -, since we do gradient ascent on the expected discounted rewards, not descent
-        policy_gradient_list.append(-log_prob*discounted_reward)
-    return policy_gradient_list
-
-
-def update_weights_offline(network: Network, rewards, log_probs, probs, actions, hidden_activities,
+def update_weights_offline(network: Network, rewards, log_probs, probs: torch.Tensor, actions, hidden_activities,
                            temporal_novelty=None, spatial_novelty=None, weight_update_mode: AnyStr = 'autograd',
                            normalize_discounted_rewards_b=False, rule=None):
 
@@ -127,11 +98,11 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 
     # inp 2 hidden updates with PG - only done if lr is not 0
     if network.learning_rate_inp2hid != 0.0:
-        policy_gradient_list = calculate_policy_gradient_element_wise(log_probs=log_probs,
+        policy_gradient_element_wise = calculate_policy_gradient_element_wise(log_probs=log_probs,
                                                                       discounted_rewards=discounted_rewards)
 
         network.optimizer.zero_grad()
-        policy_gradient: torch.Tensor = torch.stack(policy_gradient_list).sum()
+        policy_gradient: torch.Tensor = policy_gradient_element_wise.sum()
         policy_gradient.backward()  # this doesn't update the hidden to output weights, since they have require_grad=False
         network.optimizer.step()
 
@@ -170,14 +141,42 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
         raise NotImplementedError
 
 
-def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: List[torch.Tensor]):
-    assert len(actions) == len(probs)
+def calculate_discounted_rewards(rewards: torch.Tensor, gamma=0.9, normalize_discounted_rewards_b=True):
+    n = len(rewards)
+    discounted_rewards = torch.empty(n)
+    for t in range(n):
+        gamma_factor = gamma**torch.arange(n-t, dtype=torch.float)
+        discounted_rewards[t] = gamma_factor @ rewards[t:]
 
-    kroenecker_delta = torch.zeros((len(probs), len(probs[0])), requires_grad=False)
-    r = torch.arange(0, len(probs))
+    def _normalize_discounted_rewards(discounted_rewards: torch.Tensor):
+        if len(discounted_rewards) == 0:
+            raise RuntimeError("Length of discounted rewards must be non-zero")
+        elif len(discounted_rewards) == 1:
+            return torch.Tensor([0.])
+        return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
+
+    if normalize_discounted_rewards_b:
+        # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
+        discounted_rewards = _normalize_discounted_rewards(discounted_rewards)
+    return discounted_rewards
+
+
+def calculate_policy_gradient_element_wise(log_probs: torch.Tensor, discounted_rewards: torch.Tensor):
+    # policy_gradient_list: List[torch.Tensor] = []
+    # for log_prob, discounted_reward in zip(log_probs, discounted_rewards):
+    #     # -, since we do gradient ascent on the expected discounted rewards, not descent
+    #     policy_gradient_list.append(-log_prob*discounted_reward)
+    policy_gradient_element_wise = log_probs * discounted_rewards
+    return - policy_gradient_element_wise # -, since gradient ascent on the expected discounted rewards, not descent
+
+
+def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: torch.Tensor):
+    assert len(actions) == probs.shape[0]
+
+    kroenecker_delta = torch.zeros(probs.shape, requires_grad=False)
+    r = torch.arange(0, len(actions))
     kroenecker_delta[r, actions] = 1.0
-    probs_t = torch.stack(probs) # todo: remove again, when changing probs data_type above
-    sampled_action_minus_action_prob_over_time = kroenecker_delta - probs_t
+    sampled_action_minus_action_prob_over_time = kroenecker_delta - probs
 
     return sampled_action_minus_action_prob_over_time
 
@@ -187,7 +186,7 @@ def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, 
     assert len(sampled_action_minus_action_prob_over_time) == len(hidden_activities_over_time)
 
     time_dim = len(hidden_activities_over_time)
-    n_hidden_with_bias = hidden_activities_over_time[0].shape[0]
+    n_hidden_with_bias = hidden_activities_over_time.shape[1]
     n_actions = sampled_action_minus_action_prob_over_time.shape[1]
     eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias), requires_grad=False)
 
@@ -263,7 +262,7 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     # expand signals which don't have hidden dimensionality todo: adapt to case where arguments don't exist
     hidd_dim = len(weight_updates)+1
     discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
-    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
+    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(spatial_novelty, hidd_dim)
     temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
 
     # signals = signals = {"discounted_rewards": discounted_rewards_exp, "eligibility_over_time": eligibility_over_time,
