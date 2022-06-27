@@ -70,6 +70,7 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
         spatial_novelty_signals.append(spatial_novelty_currently)
 
         if done or steps == n_steps_max -1:
+            # todo: change data types List to tensors for update
             update_params = {
                 "rewards": rewards,
                 "probs": probs,
@@ -171,18 +172,13 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 
 def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: List[torch.Tensor]):
     assert len(actions) == len(probs)
-    sampled_action_minus_action_prob_over_time = torch.zeros((len(probs), len(probs[0])), requires_grad=False)
 
-    def calculate_sampled_action_minus_prob(action, probs):
-        kroenecker = torch.zeros(probs.shape, requires_grad=False)
-        kroenecker[action] = 1
-        parenthesis = kroenecker - probs
-        return parenthesis
+    kroenecker_delta = torch.zeros((len(probs), len(probs[0])), requires_grad=False)
+    r = torch.arange(0, len(probs))
+    kroenecker_delta[r, actions] = 1.0
+    probs_t = torch.stack(probs) # todo: remove again, when changing probs data_type above
+    sampled_action_minus_action_prob_over_time = kroenecker_delta - probs_t
 
-    # todo: tensorize with code snippet (sent on mattermost 2704)
-    for time_idx, sampled_action in enumerate(actions):
-        sampled_action_minus_action_prob = calculate_sampled_action_minus_prob(sampled_action, probs[time_idx])
-        sampled_action_minus_action_prob_over_time[time_idx] = sampled_action_minus_action_prob
     return sampled_action_minus_action_prob_over_time
 
 
