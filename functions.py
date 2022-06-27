@@ -57,9 +57,8 @@ def play_episode(env, net, rule, n_steps_max, temporal_novelty, rng):
     for steps in range(n_steps_max):
 
         action, prob, hidden_activities = net.get_action(state, rng)
-
-        hidden_activities = torch.cat((hidden_activities, torch.ones(1)), 0)
-        log_prob = torch.log(prob.squeeze(0)[action])
+        hidden_activities = torch.cat((hidden_activities, torch.ones(1)))
+        log_prob = torch.log(prob[action])
 
         new_state, reward, done, _ = env.step(action)
         log_probs.append(log_prob)
@@ -139,7 +138,6 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
         if rule is None:
             raise ValueError('rule must be defined for update with rule')
 
-        # test with: row sums = 0,  ++
         sampled_action_minus_action_prob_over_time = calculate_sampled_actions_minus_probs_time_array(actions, probs)
         eligibility_over_time = calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time,
                                                                 hidden_activities)
@@ -173,14 +171,15 @@ def update_weights_offline(network: Network, rewards, log_probs, probs, actions,
 
 def calculate_sampled_actions_minus_probs_time_array(actions: List[int], probs: List[torch.Tensor]):
     assert len(actions) == len(probs)
-    sampled_action_minus_action_prob_over_time = torch.zeros((len(probs), probs[0].shape[1]), requires_grad=False)
+    sampled_action_minus_action_prob_over_time = torch.zeros((len(probs), len(probs[0])), requires_grad=False)
 
     def calculate_sampled_action_minus_prob(action, probs):
         kroenecker = torch.zeros(probs.shape, requires_grad=False)
-        kroenecker[0, action] = 1
+        kroenecker[action] = 1
         parenthesis = kroenecker - probs
         return parenthesis
 
+    # todo: tensorize with code snippet (sent on mattermost 2704)
     for time_idx, sampled_action in enumerate(actions):
         sampled_action_minus_action_prob = calculate_sampled_action_minus_prob(sampled_action, probs[time_idx])
         sampled_action_minus_action_prob_over_time[time_idx] = sampled_action_minus_action_prob
@@ -198,8 +197,9 @@ def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, 
 
     def calculate_eligibility(sampled_action_minus_action_prob, hidden_activities):
         # resizing of detached clones for mat mult
+        # todo: replace with: torch.outer(sampled_action_minus_action_prob_over_time[0], hidden_activities_over_time[0])
         samp_act_clone = sampled_action_minus_action_prob.detach().clone()
-        samp_act_clone.resize_((len(samp_act_clone), 1))
+        samp_act_clone.resize_((len(samp_act_clone), 1))  # ((-1,1))
         hid_act = hidden_activities.detach().clone()
         hid_act.resize_((1, len(hid_act)))
 
@@ -226,10 +226,11 @@ def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewa
     with torch.no_grad():
         lr = network.learning_rate_hid2out
 
-        # todo: can the updates be fully vectorized (tensorized?) over the 3 dim of out, hidden and time dimension?
-        for idx_action, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
+        # todo: can the updates be fully vectorized (tensorized?) over the 3 dim of out, hidden and time dimension?:
+        # use tensor.reshape()
+        for idx_output, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             weight_bias_vector = concat_weight_bias(weight_vector, bias)
-            eligibility_over_time_current_output_unit = eligibility_over_time[:, idx_action, :]
+            eligibility_over_time_current_output_unit = eligibility_over_time[:, idx_output, :]
             weight_updates, bias_updates = \
                 compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards,
                                                                   eligibility_over_time_current_output_unit,
@@ -253,25 +254,21 @@ def _expand_signal_in_hidden_layer_dim(signal, hidden_layer_dim):
     return signal_torch_expanded
 
 
+# todo: test with function (eg dr*e+t-s) instead of rule
 def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, eligibility_over_time,
                                                       temporal_novelty=None, spatial_novelty=None,
                                                       weight_bias_vector=None):
+    if spatial_novelty is None or temporal_novelty is None or weight_bias_vector is None:
+        raise ValueError('Configuration without all arguments are currently not working')
 
     weight_updates = torch.zeros(len(weight_bias_vector)-1)
     bias_updates = torch.zeros(1).squeeze()
 
-    # expand signals which don't have hidden dimensionality
+    # expand signals which don't have hidden dimensionality todo: adapt to case where arguments don't exist
     hidd_dim = len(weight_updates)+1
     discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
-    if spatial_novelty is not None:
-        spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
-    else:
-        spatial_novelty_exp = None
-
-    if temporal_novelty is not None:
-        temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
-    else:
-        temporal_novelty_exp = None
+    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(torch.Tensor(spatial_novelty), hidd_dim)
+    temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
 
     # signals = signals = {"discounted_rewards": discounted_rewards_exp, "eligibility_over_time": eligibility_over_time,
     #                      "temporal_novelty_exp": temporal_novelty_exp, "spatial_novelty_exp": spatial_novelty_exp,
@@ -333,7 +330,7 @@ def update_output_layer_with_equation4(network: Network, rewards: List[float], e
 def calc_el_traces(probs, hidden_activities, actions, gamma=0.9):
 
     n_hidden = hidden_activities[0].size(0)
-    n_outputs = probs[0].size(1)
+    n_outputs = len(probs[0])
     n_timesteps = len(probs)
 
     el_traces = torch.zeros([n_outputs, n_hidden, n_timesteps])

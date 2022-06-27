@@ -70,19 +70,19 @@ class Network(nn.Module):
         # https://medium.com/@thechrisyoon/
         # deriving-policy-gradients-and-implementing-reinforce-f887949bd63
         hidden_activities: torch.Tensor = F.relu(self.hidden_layer(state))
-        output_activities: torch.Tensor = F.softmax(self.beta * self.output_layer(hidden_activities), dim=1)
+        output_activities: torch.Tensor = F.softmax(self.beta * self.output_layer(hidden_activities), dim=0)
 
         return hidden_activities, output_activities
 
     def get_action(self, state: np.ndarray, rng: np.random.Generator) -> Tuple[np.ndarray,
                                                                                torch.Tensor, torch.Tensor]:
-        state = torch.from_numpy(state).float().unsqueeze(0)
+        state = torch.from_numpy(state).float()
         hidden_activities, probs = self.forward(state)
         try:
             selected_action = rng.choice(self.num_actions, p=np.squeeze(probs.detach().numpy()))
         except ValueError:
             selected_action = rng.choice(self.num_actions)
-        return selected_action, probs, hidden_activities.squeeze()
+        return selected_action, probs, hidden_activities
 
 
 class VanillaRNN(nn.Module):
