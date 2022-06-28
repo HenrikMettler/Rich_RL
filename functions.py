@@ -87,11 +87,10 @@ def update_weights_offline(network: Network, rewards, log_probs, probs: torch.Te
                            temporal_novelty=None, spatial_novelty=None, weight_update_mode: AnyStr = 'autograd',
                            normalize_discounted_rewards_b=False, rule=None):
 
-    discounted_rewards = calculate_discounted_rewards(rewards,
-                                                      normalize_discounted_rewards_b=normalize_discounted_rewards_b)
+    discounted_rewards = calculate_discounted_rewards(rewards, norm_disc_r_bool=normalize_discounted_rewards_b)
 
     # inp 2 hidden updates with PG - only done if lr is not 0
-    if network.learning_rate_inp2hid != 0.0:
+    if abs(network.learning_rate_inp2hid) < 10e-9:
         policy_gradient_element_wise = calculate_policy_gradient_element_wise(log_probs=log_probs,
                                                                       discounted_rewards=discounted_rewards)
 
@@ -135,7 +134,7 @@ def update_weights_offline(network: Network, rewards, log_probs, probs: torch.Te
         raise NotImplementedError
 
 
-def calculate_discounted_rewards(rewards: torch.Tensor, gamma=0.9, normalize_discounted_rewards_b=True):
+def calculate_discounted_rewards(rewards: torch.Tensor, gamma=0.9, norm_disc_r_bool=True):
     n = len(rewards)
     discounted_rewards = torch.empty(n)
     for t in range(n):
@@ -149,7 +148,7 @@ def calculate_discounted_rewards(rewards: torch.Tensor, gamma=0.9, normalize_dis
             return torch.Tensor([0.])
         return (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-12)
 
-    if normalize_discounted_rewards_b:
+    if norm_disc_r_bool:
         # normalized discounted rewards according to: https://arxiv.org/abs/1506.02438
         discounted_rewards = _normalize_discounted_rewards(discounted_rewards)
     return discounted_rewards
@@ -236,21 +235,18 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     if spatial_novelty is None or temporal_novelty is None or weight_bias_vector is None:
         raise ValueError('Configuration without all arguments are currently not working')
 
-    # expand signals which don't have hidden dimensionality and/ or time dimensionality
     hidden_dim = len(weight_bias_vector)
     time_dim = len(discounted_rewards)
-    # expand discounted rewards and spatial novelty along hidden dimension
-    discounted_rewards_exp = torch.outer(discounted_rewards, torch.ones(hidden_dim))
-    spatial_novelty_exp = torch.outer(spatial_novelty, torch.ones(hidden_dim))
-    # expand temporal novelty along time and hidden dimension
-    temporal_novelty_exp = temporal_novelty * torch.ones([time_dim, hidden_dim])
-    # expand weight_bias_vector along time dimension
-    weight_bias_vector_exp = torch.outer(torch.ones(time_dim), weight_bias_vector)
+
+    # expand signals which don't have hidden dimensionality and/ or time dimensionality
+    discounted_rewards_exp, temporal_novelty_exp, spatial_novelty_exp, weight_bias_vector_exp = \
+        _expand_signals(discounted_rewards=discounted_rewards, temporal_novelty=temporal_novelty,
+                        spatial_novelty=spatial_novelty, weight_bias_vector=weight_bias_vector)
 
     # collapse time dimension
     discounted_rewards_coll, eligibility_coll, temporal_novelty_coll, spatial_novelty_coll, weight_bias_vector_coll = \
-        collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
-                                        spatial_novelty_exp, weight_bias_vector_exp)
+        _collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
+                                         spatial_novelty_exp, weight_bias_vector_exp)
 
     rule_input = torch.stack([discounted_rewards_coll, eligibility_coll, temporal_novelty_coll, spatial_novelty_coll,
          weight_bias_vector_coll], 1)
@@ -263,7 +259,26 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     return weight_updates, bias_update
 
 
-def collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
+# todo: is it good practise to have functions with that many output arguments? (discuss with J)
+def _expand_signals(discounted_rewards, temporal_novelty, spatial_novelty, weight_bias_vector):
+
+    hidden_dim = len(weight_bias_vector)
+    time_dim = len(discounted_rewards)
+
+    # expand discounted rewards and spatial novelty along hidden dimension
+    discounted_rewards_exp = torch.outer(discounted_rewards, torch.ones(hidden_dim))
+    spatial_novelty_exp = torch.outer(spatial_novelty, torch.ones(hidden_dim))
+
+    # expand temporal novelty along time and hidden dimension
+    temporal_novelty_exp = temporal_novelty * torch.ones([time_dim, hidden_dim])
+
+    # expand weight_bias_vector along time dimension
+    weight_bias_vector_exp = torch.outer(torch.ones(time_dim), weight_bias_vector)
+
+    return discounted_rewards_exp, temporal_novelty_exp, spatial_novelty_exp, weight_bias_vector_exp
+
+
+def _collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
                                         spatial_novelty_exp, weight_bias_vector_exp):
 
     discounted_rewards_coll = torch.reshape(discounted_rewards_exp, (-1,))
