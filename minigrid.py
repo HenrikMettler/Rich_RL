@@ -34,6 +34,7 @@ def objective(
     return individual
 
 
+# todo: test if decorator works properly!
 @cgp.utils.disk_cache(
     "cache.pkl", compute_key=cgp.utils.compute_key_from_numpy_evaluation_and_args
 )
@@ -45,8 +46,6 @@ def inner_objective(
 ) -> float:
 
     rule = ind.to_torch()
-
-    #seeds = env_params["seeds"]
 
     reward_per_seed = []
     reward_per_seed_mean = []
@@ -90,7 +89,7 @@ def calculate_validation_fitness(champion, seed, network_params, curriculum_para
 
     rewards_over_alterations = run_curriculum(env=env, net=policy_net, rule=rule, **curriculum_params, rng=rng)
 
-    return np.mean(rewards_over_alterations)
+    return rewards_over_alterations
 
 
 def set_initial_dna(ind):
@@ -148,12 +147,15 @@ if __name__ == "__main__":
 
     history['validation_fitness'] = []
     history['validated_champion_expression'] = []
+    history['validation_generation'] = []
 
-    for champion in champion_history:
-        history['validated_champion_expression'].append(str(champion.to_sympy()))
-        seed = int(seeds[-1] +100)
-        reward = calculate_validation_fitness(champion, seed, network_params, curriculum_params)
-        history['validation_fitness'].append(reward)
+    for generation, champion in enumerate(champion_history):
+        if generation == 0 or history["fitness_champion"][generation] > history["fitness_champion"][generation-1]:
+            seed = int(seeds[-1] +100)
+            reward = calculate_validation_fitness(champion, seed, network_params, curriculum_params)
+            history['validation_fitness'].append(reward)
+            history['validated_champion_expression'].append(str(champion.to_sympy()))
+            history['validation_generation'].append(generation)
     print(f"Time elapsed:", end - start)
 
     max_fitness = history["fitness_champion"][-1]

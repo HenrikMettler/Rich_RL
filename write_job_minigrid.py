@@ -69,7 +69,7 @@ if __name__ == '__main__':
     params['md5_hash_sim_script'] = utils.md5_file(params['sim_script'])  # consistency check
     params['md5_hash_dependencies'] = [utils.md5_file(fn) for fn in params['dependencies']]  # consistency check
 
-    results_folder = 'dr_el_seed_scan'
+    results_folder = 'optimized_run_time_12h'
 
     initial_seed_array = [1234567810, 1234567820, 1234567830, 1234567840, 1234567850, 1234567860, 1234567870, 1234567880, 1234567890]
 
