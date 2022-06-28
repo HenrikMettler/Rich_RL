@@ -184,15 +184,18 @@ def calculate_eligibility_over_time(sampled_action_minus_action_prob_over_time, 
 
     assert len(sampled_action_minus_action_prob_over_time) == len(hidden_activities_over_time)
 
-    time_dim = len(hidden_activities_over_time)
-    n_hidden_with_bias = hidden_activities_over_time.shape[1]
-    n_actions = sampled_action_minus_action_prob_over_time.shape[1]
-    eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias))
+    # time_dim = len(hidden_activities_over_time)
+    # n_hidden_with_bias = hidden_activities_over_time.shape[1]
+    # n_actions = sampled_action_minus_action_prob_over_time.shape[1]
+    # eligibility_over_time = torch.zeros((time_dim, n_actions, n_hidden_with_bias))
+    #
+    # for idx_time in range(time_dim):
+    #     eligibility_over_time[idx_time] = torch.outer(sampled_action_minus_action_prob_over_time[idx_time],
+    #                                         hidden_activities_over_time[idx_time])
 
-    # todo: vectorize this for loop
-    for idx_time in range(time_dim):
-        eligibility_over_time[idx_time] = torch.outer(sampled_action_minus_action_prob_over_time[idx_time],
-                                            hidden_activities_over_time[idx_time])
+    # https://pytorch.org/docs/stable/generated/torch.bmm.html
+    eligibility_over_time = torch.bmm(sampled_action_minus_action_prob_over_time.unsqueeze(2),
+                                      hidden_activities_over_time.unsqueeze(1))
     return eligibility_over_time
 
 
@@ -249,14 +252,10 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     bias_updates = torch.zeros(1).squeeze()
 
     # expand signals which don't have hidden dimensionality todo: adapt to case where arguments don't exist
-    hidd_dim = len(weight_updates)+1
+    hidd_dim = len(weight_bias_vector)
     discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
     spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(spatial_novelty, hidd_dim)
     temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
-
-    # signals = signals = {"discounted_rewards": discounted_rewards_exp, "eligibility_over_time": eligibility_over_time,
-    #                      "temporal_novelty_exp": temporal_novelty_exp, "spatial_novelty_exp": spatial_novelty_exp,
-    #                     "weight_bias_vector": weight_bias_vector}
 
     for idx_time in range(len(discounted_rewards)):
         # todo: adapt to rule with variable number of inputs
@@ -264,6 +263,8 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
                                     temporal_novelty_exp, spatial_novelty_exp[idx_time, :], weight_bias_vector], 1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
+
+    time_dim = len(discounted_rewards)
     return weight_updates, bias_updates
 
 
