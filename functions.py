@@ -233,39 +233,46 @@ def concat_weight_bias(weight_vector, bias):
     return weight_bias_vector
 
 
-def _expand_signal_in_hidden_layer_dim(signal, hidden_layer_dim):
-    ones = torch.ones(hidden_layer_dim)
-    ones = ones.resize_(1,(len(ones)))
-    signal.resize_(len(signal),1)
-    signal_torch_expanded = signal*ones
-    return signal_torch_expanded
-
-
 # todo: test with function (eg dr*e+t-s) instead of rule
 def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, eligibility_over_time,
                                                       temporal_novelty=None, spatial_novelty=None,
                                                       weight_bias_vector=None):
+    # todo: adapt to case where not all arguments exist
     if spatial_novelty is None or temporal_novelty is None or weight_bias_vector is None:
         raise ValueError('Configuration without all arguments are currently not working')
 
     weight_updates = torch.zeros(len(weight_bias_vector)-1)
     bias_updates = torch.zeros(1).squeeze()
 
-    # expand signals which don't have hidden dimensionality todo: adapt to case where arguments don't exist
-    hidd_dim = len(weight_bias_vector)
-    discounted_rewards_exp = _expand_signal_in_hidden_layer_dim(discounted_rewards, hidd_dim)
-    spatial_novelty_exp = _expand_signal_in_hidden_layer_dim(spatial_novelty, hidd_dim)
-    temporal_novelty_exp = temporal_novelty*torch.ones(hidd_dim)
+    # expand signals which don't have hidden dimensionality and/ or time dimensionality
+    hidden_dim = len(weight_bias_vector)
+    time_dim = len(discounted_rewards)
+    # expand discounted rewards and spatial novelty along hidden dimension
+    discounted_rewards_exp = torch.outer(discounted_rewards, torch.ones(hidden_dim))
+    spatial_novelty_exp = torch.outer(spatial_novelty, torch.ones(hidden_dim))
+    # expand temporal novelty along time and hidden dimension
+    temporal_novelty_exp = temporal_novelty * torch.ones([time_dim, hidden_dim])
+    # expand weight_bias_vector along time dimension
+    weight_bias_vector_exp = torch.outer(torch.ones(time_dim), weight_bias_vector)
+
+    # temporal_novelty_exp = temporal_novelty*torch.ones(hidden_dim)
 
     for idx_time in range(len(discounted_rewards)):
         # todo: adapt to rule with variable number of inputs
         updates = rule(torch.stack([discounted_rewards_exp[idx_time, :], eligibility_over_time[idx_time, :],
-                                    temporal_novelty_exp, spatial_novelty_exp[idx_time, :], weight_bias_vector], 1))
+                                    temporal_novelty_exp[idx_time, :], spatial_novelty_exp[idx_time, :], weight_bias_vector], 1))
         weight_updates += updates[:-1].squeeze()
         bias_updates += updates[-1].squeeze()
 
-    time_dim = len(discounted_rewards)
     return weight_updates, bias_updates
+
+
+def concat_along_hidden_dimension():
+    raise NotImplementedError
+
+
+def sum_updates_along_time_dimension():
+    raise NotImplementedError
 
 
 def update_output_layer_with_equation2(network: Network, discounted_rewards: torch.Tensor, probs,
