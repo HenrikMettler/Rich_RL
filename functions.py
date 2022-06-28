@@ -5,11 +5,6 @@ from network import Network
 from typing import AnyStr, List
 
 
-def rule_wrapper(rule, discounted_rewards, eligibility_over_time,
-                 temporal_novelty=None, spatial_novelty=None, weights=None):
-    raise NotImplementedError
-
-
 def run_curriculum(env, net, rule, max_n_alterations, n_alterations_per_new_env, prob_alteration_dict,
                    spatial_novelty_distance_decay, n_episodes_per_alteration, n_steps_max, temporal_novelty_decay,
                    spatial_novelty_time_decay, rng):
@@ -213,8 +208,7 @@ def update_output_layer_with_evolved_rule_offline(rule, network, discounted_rewa
     with torch.no_grad():
         lr = network.learning_rate_hid2out
 
-        # todo: can the updates be fully vectorized (tensorized?) over the 3 dim of out, hidden and time dimension?:
-        # use tensor.reshape()
+        # todo: can the updates be vectorized over the output dimension?:
         for idx_output, (weight_vector, bias) in enumerate(zip(network.output_layer.weight, network.output_layer.bias)):
             weight_bias_vector = concat_weight_bias(weight_vector, bias)
             eligibility_over_time_current_output_unit = eligibility_over_time[:, idx_output, :]
@@ -237,12 +231,10 @@ def concat_weight_bias(weight_vector, bias):
 def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, eligibility_over_time,
                                                       temporal_novelty=None, spatial_novelty=None,
                                                       weight_bias_vector=None):
+
     # todo: adapt to case where not all arguments exist
     if spatial_novelty is None or temporal_novelty is None or weight_bias_vector is None:
         raise ValueError('Configuration without all arguments are currently not working')
-
-    weight_updates = torch.zeros(len(weight_bias_vector)-1)
-    bias_updates = torch.zeros(1).squeeze()
 
     # expand signals which don't have hidden dimensionality and/ or time dimensionality
     hidden_dim = len(weight_bias_vector)
@@ -255,24 +247,33 @@ def compute_updates_per_output_unit_with_rule_offline(rule, discounted_rewards, 
     # expand weight_bias_vector along time dimension
     weight_bias_vector_exp = torch.outer(torch.ones(time_dim), weight_bias_vector)
 
-    # temporal_novelty_exp = temporal_novelty*torch.ones(hidden_dim)
+    # collapse time dimension
+    discounted_rewards_coll, eligibility_coll, temporal_novelty_coll, spatial_novelty_coll, weight_bias_vector_coll = \
+        collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
+                                        spatial_novelty_exp, weight_bias_vector_exp)
 
-    for idx_time in range(len(discounted_rewards)):
-        # todo: adapt to rule with variable number of inputs
-        updates = rule(torch.stack([discounted_rewards_exp[idx_time, :], eligibility_over_time[idx_time, :],
-                                    temporal_novelty_exp[idx_time, :], spatial_novelty_exp[idx_time, :], weight_bias_vector], 1))
-        weight_updates += updates[:-1].squeeze()
-        bias_updates += updates[-1].squeeze()
+    rule_input = torch.stack([discounted_rewards_coll, eligibility_coll, temporal_novelty_coll, spatial_novelty_coll,
+         weight_bias_vector_coll], 1)
+    all_updates = rule(rule_input)
+    update_per_time_step = torch.reshape(all_updates, (time_dim, hidden_dim))  # todo: check whether this does the right thing dimension wise!
+    update_per_weight = torch.sum(update_per_time_step, dim=0)
 
-    return weight_updates, bias_updates
-
-
-def concat_along_hidden_dimension():
-    raise NotImplementedError
+    weight_updates = update_per_weight[:-1]
+    bias_update = update_per_weight[-1]
+    return weight_updates, bias_update
 
 
-def sum_updates_along_time_dimension():
-    raise NotImplementedError
+def collapse_along_hidden_dimension(discounted_rewards_exp, eligibility_over_time, temporal_novelty_exp,
+                                        spatial_novelty_exp, weight_bias_vector_exp):
+
+    discounted_rewards_coll = torch.reshape(discounted_rewards_exp, (-1,))
+    eligibility_coll = torch.reshape(eligibility_over_time, (-1,))
+    temporal_novelty_coll = torch.reshape(temporal_novelty_exp, (-1,))
+    spatial_novelty_coll = torch.reshape(spatial_novelty_exp, (-1,))
+    weight_bias_vector_coll = torch.reshape(weight_bias_vector_exp, (-1,))
+
+    return discounted_rewards_coll, eligibility_coll, temporal_novelty_coll, spatial_novelty_coll, \
+           weight_bias_vector_coll
 
 
 def update_output_layer_with_equation2(network: Network, discounted_rewards: torch.Tensor, probs,
